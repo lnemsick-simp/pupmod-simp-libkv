@@ -1,4 +1,8 @@
-[![License](http://img.shields.io/:license-apache-blue.svg)](http://www.apache.org/licenses/LICENSE-2.0.html) [![Build Status](https://travis-ci.org/simp/pupmod-simp-libkv.svg)](https://travis-ci.org/simp/pupmod-simp-libkv) [![SIMP compatibility](https://img.shields.io/badge/SIMP%20compatibility-6.*-orange.svg)](https://img.shields.io/badge/SIMP%20compatibility-6.*-orange.svg)
+[![License](https://img.shields.io/:license-apache-blue.svg)](http://www.apache.org/licenses/LICENSE-2.0.html)
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/73/badge)](https://bestpractices.coreinfrastructure.org/projects/73)
+[![Puppet Forge](https://img.shields.io/puppetforge/v/simp/libkv.svg)](https://forge.puppetlabs.com/simp/libkv)
+[![Puppet Forge Downloads](https://img.shields.io/puppetforge/dt/simp/libkv.svg)](https://forge.puppetlabs.com/simp/libkv)
+[![Build Status](https://travis-ci.org/simp/pupmod-simp-libkv.svg)](https://travis-ci.org/simp/pupmod-simp-libkv)
 
 #### Table of Contents
 
@@ -6,9 +10,15 @@
 2. [Usage - Configuration options and additional functionality](#usage)
 3. [Testing](#testing)
 4. [Function Reference](#function-reference)
-<% data["functions"].each do |key, value| %>    * [libkv::<%= key %>](#<%= key %>)
-<% end %>
+
+<% data['functions'].each do |key, value| -%>
+<%   unless value[:unsupported] -%>
+    * [libkv::<%= key %>](#<%= key %>)
+<%   end -%>
+<% end -%>
+
 5. [Development - Guide for contributing to the module](#development)
+
     * [Acceptance Tests - Beaker env variables](#acceptance-tests)
 
 ## Description
@@ -36,11 +46,10 @@ libkv currently supports the following providers:
 
 With the intention to support the following:
 * `etcd` - Allows connectivity to an existing etcd service
-* `simp6-legacy` - Implements the SIMP 6 legacy file storage api. 
-* `file` - Implements a non-ha flat file storage api.
+* `simp6-legacy` - Implements the SIMP 6 legacy file storage api.
+* `file` - Implements a non-HA flat file storage api.
 
-This module is a component of the [System Integrity Management
-Platform](https://github.com/NationalSecurityAgency/SIMP), a
+This module is a component of the [System Integrity Management Platform](https://simp-project.com), a
 compliance-management framework built on Puppet.
 
 If you find any issues, they may be submitted to our [bug
@@ -52,9 +61,9 @@ As an example, you can use the following to store hostnames, and then read all
 the known hostnames from consul and generate a hosts file:
 
 ```puppet
-libkv::put("/hosts/${::clientcert}", $::ipaddress)
+libkv::put("/hosts/${facts['clientcert']}", $facts['ipaddress'])
 
-$hosts = libkv::list("/hosts")
+$hosts = libkv::list('/hosts')
 $hosts.each |$host, $ip | {
   host { $host:
     ip => $ip,
@@ -87,7 +96,7 @@ libkv::url: 'consul://127.0.0.1:8500/puppet/%{trusted.extensions.pp_department}/
 
 Manual and automated tests require a shim to kick off Consul inside of Docker,
 before running.  Travis is programmed to run the shim.  To do so manually,
-first ensure you have [set up Docker](http://simp.readthedocs.io/en/latest/getting_started_guide/ISO_Build/Environment_Preparation.html#set-up-docker) properly.
+first ensure you have [set up Docker](https://simp.readthedocs.io/en/stable/getting_started_guide/Installation_Options/ISO/ISO_Build/Environment_Preparation.html#set-up-docker) properly.
 
 Next, run the shim:
 
@@ -105,45 +114,48 @@ $ bundle exec rake spec
 ```
 
 ## Function reference
-<% data["functions"].each do |key, value| %>
+<% data['functions'].each do |key, value| -%>
+<%   next if value[:unsupported] -%>
+
 <h3><a id="<%= key %>">libkv::<%= key %></a></h3>
 
 <%= value[:description] %>
-<% unless value[:reserved] == true %>
-<% if value[:allow_empty] == true %>
-`<%= value[:retval] %> <%= "$#{value[:examplereturn]}" %> = libkv::<%= key %>()`
-<% end %>
-<% if value.key?(:signatures) %>
-<% value[:signatures].each do |signaturename, definition|%>
-<%
-   argarray = []
-   definition["args"].each do |element|
-      argarray << "#{element['type']} #{element['name']}"
-   end
-   arglist = argarray.join(", ")
-%>
-`<%= value[:retval] %> $<%= value[:examplereturn] %> = libkv::<%= key %>(<%= arglist %>)`
-<% end %>
-<% end %>
-*Returns:*
-<%= value[:retval] %>
-<% if value.key?(:examples) %>
+<%   unless value[:reserved] -%>
+<%     if value[:allow_empty] == true -%>
+
+`<%= value[:retval][:type] %> <%= "$#{value[:examplereturn]}" %> = libkv::<%= key %>()`
+<%     end -%>
+<%     if value.key?(:signatures) -%>
+<%       value[:signatures].each do |signaturename, definition|
+           argarray = []
+           definition[:args].each do |element|
+             argarray << "#{element[:type]} #{element[:name]}"
+           end
+           arglist = argarray.join(', ')
+-%>
+
+`<%= value[:retval][:type] %> $<%= value[:examplereturn] %> = libkv::<%= key %>(<%= arglist %>)`
+<%       end -%>
+<%     end -%>
+
+*Returns:* <%= value[:retval][:type] %>
+<%     if value.key?(:examples) -%>
+
 *Usage:*
-<% value[:examples].each do |example|%>
+<%       value[:examples].each do |example| -%>
 
 <pre lang="ruby">
-<%= example %>
+<%= example.gsub("\t", '  ').rstrip %>
 </pre>
-<% end %>
-<% end %>
 
-
-<% end %>
-<% end %>
+<%       end -%>
+<%     end -%>
+<%   end -%>
+<% end -%>
 
 ## Development
 
-Please read our [Contribution Guide](http://simp-doc.readthedocs.io/en/stable/contributors_guide/index.html).
+Please read our [Contribution Guide](https://simp.readthedocs.io/en/stable/contributors_guide/index.html).
 
 ### Acceptance tests
 

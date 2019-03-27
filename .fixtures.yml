@@ -5,6 +5,10 @@ fixtures:
     iptables: "https://github.com/simp/pupmod-simp-iptables.git"
     simplib:  "https://github.com/simp/pupmod-simp-simplib.git"
     consul:   "https://github.com/simp/puppet-consul.git"
-    archive:  "https://github.com/voxpupuli/puppet-archive.git"
+    archive:  "https://github.com/simp/puppet-archive.git"
+    # This needs to be in place for the rspec-puppet Hiera 5 hook to work
+    # No idea why, it may be because Puppet sees a custom backend and loads all
+    # of the global parts.
+    compliance_markup: https://github.com/simp/pupmod-simp-compliance_markup
   symlinks:
     libkv: "#{source_dir}"

@@ -1,0 +1,119 @@
+# <%= value[:description] %>
+#
+# @author https://github.com/simp/pupmod-simp-libkv/graphs/contributors
+#
+Puppet::Functions.create_function(:'libkv::<%= function %>') do
+
+  # @param parameters Hash of all parameters
+  #
+  # @return [<%= value[:retval][:type] %>] <%= value[:retval][:description] %>
+  #
+  # @raise [RuntimeError] if Ruby files needed for libkv operation
+  # cannot be found
+  dispatch :<%= function %> do
+    param 'Hash', :parameters
+  end
+<% if value[:allow_empty] -%>
+
+  # @return [<%= value[:retval][:type] %>] <%= value[:retval][:description] %>
+  #
+  dispatch :<%= function + '_empty' %> do
+  end
+
+  def <%= function + '_empty' %>
+     self.<%= function %>({})
+  end
+<% end -%>
+<% unless value[:signatures].nil? -%>
+<%   value[:signatures].each do |key, spec| -%>
+
+<%     unless spec[:args].nil? -%>
+<%       spec[:args].each do |argument| -%>
+  # @param <%= argument[:name] %> <%=argument[:description] %>
+<%       end -%>
+<%     end -%>
+  #
+  # @return [<%= value[:retval][:type] %>] <%= value[:retval][:description] %>
+  #
+  #
+  # @raise [RuntimeError] if Ruby files needed for libkv operation
+  # cannot be found
+  dispatch :<%= function + '_' + key %> do
+<%     unless spec[:args].nil? -%>
+<%       spec[:args].each do |argument| -%>
+    param '<%= argument[:type] %>', :<%= argument[:name] %>
+<%       end -%>
+<%     end -%>
+  end
+
+<%     unless spec[:args].nil?
+#FIXME should be able to do this in a map operation
+          array = []
+          spec[:args].each do |argument|
+            array << argument[:name]
+          end
+          args = array.join(', ')
+       end -%>
+  def <%= function + '_' + key %>(<%= args -%>)
+    params = {}
+<%     unless spec[:args].nil? -%>
+<%       spec[:args].each do |argument| -%>
+    <%= "params['" + argument[:name] + "'] = " + argument[:name] %>
+<%       end -%>
+<%     end -%>
+
+    <%= function%>(params)
+  end
+<%   end -%>
+<% end -%>
+
+  def <%= function %>(params)
+    nparams = params.dup
+
+    # retrieve/create the libkv 'extension' of the catalog instance
+    catalog = closure_scope.find_global_scope.catalog
+    libkv = nil
+    begin
+      libkv = catalog.libkv
+    rescue NoMethodError
+      lib_dir = File.dirname(File.dirname(File.dirname(File.dirname("#{__FILE__}"))))
+      filename = File.join(lib_dir, 'puppet_x', 'libkv', 'loader.rb')
+      if File.exists?(filename)
+        catalog.instance_eval(File.read(filename), filename)
+        libkv = catalog.libkv
+      else
+        raise("Internal error: libkv::<%= function %> unable to load #{filename}: File not found")
+      end
+    end
+
+    # determine url and auth parameters to use
+    if nparams.key?('url')
+      url = nparams['url']
+    else
+      url = call_function('lookup', 'libkv::url', { 'default_value' => 'mock://' })
+    end
+    nparams['url'] = url
+
+    if nparams.key?('auth')
+      auth = nparams['auth']
+    else
+      auth = call_function('lookup', 'libkv::auth', { 'default_value' => nil })
+    end
+    nparams['auth'] = auth
+
+    # use libkv for <%= function %> operation
+    retval = nil
+    if (nparams['softfail'] == true)
+      begin
+        retval = libkv.<%= function %>(url, auth, nparams);
+      rescue
+        retval = <%= value[:softfail] %>
+      end
+    else
+      retval = libkv.<%= function %>(url, auth, nparams);
+    end
+    return retval;
+  end
+end
+
+# vim: set expandtab ts=2 sw=2:

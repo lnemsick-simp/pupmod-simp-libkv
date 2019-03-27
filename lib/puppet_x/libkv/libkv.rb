@@ -37,7 +37,7 @@ def symbol_table()
       'previous' => "Hash",
       'url' => "String",
       'auth' => "Hash",
-      'value' => "",
+      'value' => "",  # value can't be nil
     },
     :get => {
       'key' => "required",
@@ -328,7 +328,7 @@ end
 # Every file in lib/puppet_x/libkv/*_provider.rb is assumed
 # to contain a libkv backend provider, and we load them in.
 #
-# Every provider uses $LIBKV.load() to actually define itself,
+# Every provider uses libkv.load() to actually define itself,
 # which results in catalog.libkv.classes['providername'] to return
 # the Class that implements the provider.
 providerglob = File.dirname(File.dirname(File.dirname(File.dirname(File.dirname(__FILE__))))) + "/*/lib/puppet_x/libkv/*_provider.rb"

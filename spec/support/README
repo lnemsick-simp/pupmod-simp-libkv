@@ -1,0 +1,10 @@
+Files in this directory are for the consul libkv provider tests
+(spec tests and what appears to be manual tests).  The files have
+been moved from the top directory to here, but
+
+  **HAVE NOT BEEN FIXED**
+
+Also, it is unclear if the Vagrantfile needs to be moved back into
+top-level directory in order for TraviCI to be able to use the
+'vagrant' service that is configured in the .travis.yml....Couldn't
+find any documentation on the vagrant service.

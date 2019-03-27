@@ -51,11 +51,9 @@ describe 'libkv::supports', :type => :puppet_function do
         "provider",
         "supports",
       ]
-      expected_operations.each do |operation|
-        it "should return #{operation}" do
-          result = subject.execute(params);
-          expect(result.include?(operation)).to eql(true);
-        end
+      it 'should return an array of supported operations' do
+        result = subject.execute(params);
+        expect(result.sort).to eql(expected_operations.sort);
       end
     end
   end

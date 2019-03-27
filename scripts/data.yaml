@@ -3,71 +3,87 @@
 functions:
   get:
     :examplereturn: data
-    :retval: 'Any'
+    :retval:
+      :type: 'Any'
+      :description: 'The value in the underlying backing store'
     :description: 'Connects to the backend and retrieves the data stored at **key**'
     :softfail: nil
     :signatures:
       v1:
-        args:
-          - type: 'String'
-            name: 'key'
+        :args:
+          - :type: 'String'
+            :name: 'key'
+            :description: 'The key to get'
     :examples:
       - "
-         $database_server = libkv::get(\"/database/${::fqdn}\")\n
-         class { \"wordpress\":\n
+         $database_server = libkv::get(\"/database/${facts['fqdn']}\")\n
+         class { 'wordpress':\n
          \tdb_host => $database_server,\n
          }"
   put:
-    :examplereturn: suceeeded
-    :retval: 'Boolean'
+    :examplereturn: succeeded
+    :retval:
+      :type: 'Boolean'
+      :description: 'Whether the backend set operation succeeded'
     :description: 'Sets the data at `key` to the specified `value`'
     :softfail: 'false'
     :signatures:
       v1:
-        args:
-          - type: 'String'
-            name: 'key'
-          - type: 'Any'
-            name: 'value'
+        :args:
+          - :type: 'String'
+            :name: 'key'
+            :description: 'The key to be set'
+          - :type: 'Any'
+            :name: 'value'
+            :description: 'The value of the key'
     :examples:
-      - "libkv::put(\"/hosts/${::fqdn}\", \"${::ipaddress}\")"
+      - "libkv::put(\"/hosts/${facts['fqdn']}\", \"${facts['ipaddress']}\")"
   delete:
-    :examplereturn: suceeeded
-    :retval: 'Boolean'
+    :examplereturn: succeeded
+    :retval:
+      :type: 'Boolean'
+      :description: 'Whether the backend operation succeeded'
     :description: 'Deletes the specified `key`. Must be a single key'
     :softfail: 'false'
     :signatures:
       v1:
-        args:
-          - type: 'String'
-            name: 'key'
+        :args:
+          - :type: 'String'
+            :name: 'key'
+            :description: 'The key to be deleted'
     :examples:
-      - "$response = libkv::delete(\"/hosts/${::fqdn}\")\n"
+      - "$response = libkv::delete(\"/hosts/${facts['fqdn']}\")"
   exists:
     :examplereturn: exists
-    :retval: 'Boolean'
+    :retval:
+      :type: 'Boolean'
+      :description: 'Whether the `key` exists in the backend'
     :description: 'Returns true if `key` exists'
     :softfail: nil
     :signatures:
       v1:
-        args:
-          - type: 'String'
-            name: 'key'
+        :args:
+          - :type: 'String'
+            :name: 'key'
+            :description: 'The key to check'
     :examples:
       - "
-        if (libkv::exists(\"/hosts/${::fqdn}\") == true) {\n
-        \tnotify { \"/hosts/${::fqdn} exists\": }\n
+        if libkv::exists(\"/hosts/${facts['fqdn']}\") {\n
+        \tnotify { \"/hosts/${facts['fqdn']} exists\": }\n
         }"
   list:
     :examplereturn: list
-    :retval: 'Hash'
+    :retval:
+      :type: 'Hash'
+      :description: 'Hash of key/value pairs'
     :description: 'Lists all keys in the folder named `key`'
     :softfail: "{}"
     :signatures:
       v1:
-        args:
-          - type: 'String'
-            name: 'key'
+        :args:
+          - :type: 'String'
+            :name: 'key'
+            :description: 'The folder to list'
     :examples:
       - "
         $list = libkv::list('/hosts')\n
@@ -78,107 +94,129 @@ functions:
         }"
   deletetree:
     :examplereturn: succeeded
-    :retval: 'Boolean'
+    :retval:
+      :type: 'Boolean'
+      :description: 'Whether the backend folder deletion operation succeeded'
     :description: 'Deletes the whole folder named `key`. This action is inherently unsafe.'
     :softfail: 'false'
     :signatures:
       v1:
-        args:
-          - type: 'String'
-            name: 'key'
+        :args:
+          - :type: 'String'
+            :name: 'key'
+            :description: 'The folder to delete'
     :examples:
-      - "$response = libkv::deletetree(\"/hosts\")\n"
+      - "$response = libkv::deletetree('/hosts')"
   atomic_create:
-    :examplereturn: suceeeded
-    :retval: 'Boolean'
-    :description: 'Store `value` in `key`, but only if key does not exist already, and do so atomically'
+    :examplereturn: succeeded
+    :retval:
+      :type: 'Boolean'
+      :description: 'Whether the backend create operation succeeded'
+    :description: 'Store `value` in `key` atomically, but only if key does not already exist'
     :softfail: "{}"
     :signatures:
       v1:
-        args:
-          - type: 'String'
-            name: 'key'
-          - type: 'Any'
-            name: 'value'
+        :args:
+          - :type: 'String'
+            :name: 'key'
+            :description: 'The key to be created'
+          - :type: 'Any'
+            :name: 'value'
+            :description: 'The value of the key'
     :examples:
       - "
          $id = rand(0,2048)\n
-         $result = libkv::atomic_create(\"/serverids/${::fqdn}\", $id)\n
+         $result = libkv::atomic_create(\"/serverids/${facts['fqdn']}\", $id)\n
          if ($result == false) {\n
-         \t$serverid = libkv::get(\"/serverids/${::fqdn}\")\n
+         \t$serverid = libkv::get(\"/serverids/${facts['fqdn']}\")\n
          } else {\n
          \t$serverid = $id\n
          }\n
-         notify(\"the server id of ${serverid} is indempotent!\")
+         notify(\"the server id of ${serverid} is idempotent!\")
         "
   atomic_delete:
-    :examplereturn: suceeded
-    :retval: 'Boolean'
+    :examplereturn: succeeded
+    :retval:
+      :type: 'Boolean'
+      :description: 'Whether the backend delete operation succeeded'
     :description: 'Delete `key`, but only if key still matches the value of `previous`'
     :softfail: "{}"
     :signatures:
       v1:
-        args:
-          - type: 'String'
-            name: 'key'
-          - type: 'Hash'
-            name: 'previous'
+        :args:
+          - :type: 'String'
+            :name: 'key'
+            :description: 'The key to delete'
+          - :type: 'Hash'
+            :name: 'previous'
+            :description: 'The value in the underlying backing store'
     :examples:
       - "
-         $previous = libkv::atomic_get(\"/env/${::fqdn}\")\n
-         $result = libkv::atomic_delete(\"/env/${::fqdn}\", $previous)\n
+         $previous = libkv::atomic_get(\"/env/${facts['fqdn']}\")\n
+         $result = libkv::atomic_delete(\"/env/${facts['fqdn']}\", $previous)
         "
   atomic_get:
     :examplereturn: previous
-    :retval: 'Hash'
+    :retval:
+      :type: 'Hash'
+      :description: 'Hash containing the value in the underlying backing store'
     :description: 'Get the value of key, but return it in a hash suitable for use with other atomic functions'
     :softfail: "{}"
     :signatures:
       v1:
-        args:
-          - type: 'String'
-            name: 'key'
+        :args:
+          - :type: 'String'
+            :name: 'key'
+            :description: 'The key whose value is to be retreived'
     :examples:
       - "
-         $previous = libkv::atomic_get(\"/env/${::fqdn}\")\n
-         notify { \"previous value is ${previous[\"value\"]}\": }\n
+         $previous = libkv::atomic_get(\"/env/${facts['fqdn']}\")\n
+         notify { \"previous value is ${previous['value']}\": }
         "
   atomic_put:
-    :examplereturn: suceeeded
-    :retval: 'Boolean'
+    :examplereturn: succeeded
+    :retval:
+      :type: 'Boolean'
+      :description: 'Whether the backend set operation succeeded'
     :description: 'Set `key` to `value`, but only if the key is still set to `previous`'
     :softfail: "{}"
     :signatures:
       v1:
-        args:
-          - type: 'String'
-            name: 'key'
-          - type: 'Any'
-            name: 'value'
-          - type: 'Hash'
-            name: 'previous'
+        :args:
+          - :type: 'String'
+            :name: 'key'
+            :description: 'The key to be set'
+          - :type: 'Any'
+            :name: 'value'
+            :description: 'The value of the key'
+          - :type: 'Hash'
+            :name: 'previous'
+            :description: 'Hash containing the previous value of the key'
     :examples:
       - "
          $newvalue = 'new'\n
-         $previous = libkv::atomic_get(\"/env/${::fqdn}\")\n
-         $result = libkv::atomic_put(\"/env/${::fqdn}\", $newvalue, $previous)\n
+         $previous = libkv::atomic_get(\"/env/${facts['fqdn']}\")\n
+         $result = libkv::atomic_put(\"/env/${facts['fqdn']}\", $newvalue, $previous)\n
          if ($result == true) {\n
          \t$real = $newvalue\n
          } else {\n
-         \t$real = libkv::get(\"/env/${::fqdn}\")\n
+         \t$real = libkv::get(\"/env/${facts['fqdn']}\")\n
          }\n
-         notify { \"I updated to $real atomically!\": }\n
+         notify { \"I updated to ${real} atomically!\": }
         "
   atomic_list:
     :examplereturn: list
-    :retval: 'Hash'
+    :retval:
+      :type: 'Hash'
+      :description: 'Hash of key/value pairs'
     :description: 'List all keys in folder `key`, but return them in a format suitable for other atomic functions'
     :softfail: "{}"
     :signatures:
       v1:
-        args:
-          - type: 'String'
-            name: 'key'
+        :args:
+          - :type: 'String'
+            :name: 'key'
+            :description: 'The folder to list'
     :examples:
       - "# Add a host resource for everything under /hosts\n\n
         $list = libkv::atomic_list('/hosts')\n
@@ -190,36 +228,42 @@ functions:
       - "# For each host in /hosts, atomically update the value to 'newip'\n\n
         $list = libkv::atomic_list('/hosts')\n
         $list.each |String $host, Hash $data| {\n
-        \tlibkv::atomic_put(\"/hosts/${host}\", \"newip\", $data)\n
+        \tlibkv::atomic_put(\"/hosts/${host}\", 'newip', $data)\n
         }"
   empty_value:
     :examplereturn: empty_value
-    :retval: 'Hash'
+    :retval:
+      :type: 'Hash'
+      :description: 'Empty hash representing an empty value'
     :description: 'Return an hash suitable for other atomic functions, that represents an empty value'
     :softfail: nil
     :allow_empty: true
     :examples:
       - "
          $empty = libkv::empty()\n
-         $result = libkv::atomic_get(\"/some/key\")\n
+         $result = libkv::atomic_get('/some/key')\n
          if ($result == $empty) {\n
          \tnotify { \"/some/key doesn't exist\": }\n
-         }\n
+         }
         "
   info:
     :examplereturn: provider_information
-    :retval: 'Hash'
+    :retval:
+      :type: 'Hash'
+      :description: 'Provider information hash'
     :description: 'Return a hash of informtion on the underlying provider. Provider specific'
     :softfail: "{}"
     :allow_empty: true
     :examples:
       - "
          $info = libkv::info()\n
-         notify { \"libkv connection is: ${info}\": }\n
+         notify { \"libkv connection is: ${info}\": }
         "
   supports:
     :examplereturn: supported_functions
-    :retval: 'Array'
+    :retval:
+      :type: 'Array'
+      :description: 'Array of provider supported functions'
     :description: 'Return an array of all supported functions'
     :softfail: "[]"
     :allow_empty: true
@@ -230,39 +274,41 @@ functions:
          \tlibkv::atomic_get('/some/key')\n
          } else {\n
          \tlibkv::get('/some/key')\n
-         }\n
+         }
         "
   pop_error:
-    :reserved: true
+#    :reserved: true
     :examplereturn: error_string
-    :retval: 'String'
+    :retval:
+      :type: 'String'
+      :description: "Provider's error message for the last call"
     :description: 'Return the error message for the last call'
     :softfail: '""'
     :allow_empty: true
     :examples:
       - "
-         $supports = libkv::supports()\n
-         if ($supports in 'atomic_get') {\n
-         \tlibkv::atomic_get('/some/key')\n
-         } else {\n
-         \tlibkv::get('/some/key')\n
-         }\n
+        unless libkv::put(\"/hosts/${facts['fqdn']}\", \"${facts['ipaddress']}\") {\n
+        \t$put_err_msg = libkv::pop_error()\n
+        \tnotify { \"Setting /hosts/${facts['fqdn']} failed: ${put_err_msg}\": }\n
+        }
         "
   provider:
     :examplereturn: provider_name
-    :retval: 'String'
+    :retval:
+      :type: 'String'
+      :description: 'Provider name'
     :description: 'Return the name of the current provider'
     :softfail: '""'
     :allow_empty: true
     :examples:
       - "
          $provider = libkv::provider()\n
-         notify { \"libkv connection is: ${provider}\": }\n
+         notify { \"libkv connection is: ${provider}\": }
         "
   watch:
-    :reserved: true
+    :unsupported: true
   watchtree:
-    :reserved: true
+    :unsupported: true
   newlock:
-    :reserved: true
+    :unsupported: true
 

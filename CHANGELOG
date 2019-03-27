@@ -1,3 +1,32 @@
+* Wed Mar 27 2019 Liz Nemsick <lnemsick.simp@gmail.com> - 0.7.0
+- Merged in changes released with 0.6.1 and on the 'develop' branch
+- Updated Puppet and stdlib dependency versions
+  - Dropped Puppet 4 support
+  - Added Puppet 6 support
+  - Added puppetlabs-stdlib 6 support
+- Updated/fixed Ruby-language functions via generator-code updates
+  - Fixed a bug in the  function signatures in which all parameters
+    had the name 'parameters'
+  - Removed use of an OBE global Ruby variable.  That code used to
+    be needed to work around rspec issues.
+  - Fixed function code formatting issues identified in lint checks and
+    visual inspection
+  - Improved function error reporting
+  - Added more function documentation
+- Updated URLs and examples in the README.md
+- Configured module build to omit the function generator scripts from the
+  published Puppet module
+- Removed test manifests that should not be part of the module
+- Removed libkv functions that are not fully supported
+  - libkv::watch
+  - libkv::watchtree
+  - libkv::newlock
+- Removed empty directories carried over from module template
+- Removed OBE CONTRIBUTORS file
+
+* Wed Jan 31 2018 Dylan Cochran <dylan.cochran@onyxpoint.com> - 0.6.1
+- Release 0.6.1
+
 * Thu Oct 26 2017 Nick Markowski <nicholas.markowski@onyxpoint.com> - 0.6.0
 - (SIMP-3923) Moved libkv::consul to pupmod-simp-simp_consul
 - Updated README

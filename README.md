@@ -1,4 +1,8 @@
-[![License](http://img.shields.io/:license-apache-blue.svg)](http://www.apache.org/licenses/LICENSE-2.0.html) [![Build Status](https://travis-ci.org/simp/pupmod-simp-libkv.svg)](https://travis-ci.org/simp/pupmod-simp-libkv) [![SIMP compatibility](https://img.shields.io/badge/SIMP%20compatibility-6.*-orange.svg)](https://img.shields.io/badge/SIMP%20compatibility-6.*-orange.svg)
+[![License](https://img.shields.io/:license-apache-blue.svg)](http://www.apache.org/licenses/LICENSE-2.0.html)
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/73/badge)](https://bestpractices.coreinfrastructure.org/projects/73)
+[![Puppet Forge](https://img.shields.io/puppetforge/v/simp/libkv.svg)](https://forge.puppetlabs.com/simp/libkv)
+[![Puppet Forge Downloads](https://img.shields.io/puppetforge/dt/simp/libkv.svg)](https://forge.puppetlabs.com/simp/libkv)
+[![Build Status](https://travis-ci.org/simp/pupmod-simp-libkv.svg)](https://travis-ci.org/simp/pupmod-simp-libkv)
 
 #### Table of Contents
 
@@ -6,6 +10,7 @@
 2. [Usage - Configuration options and additional functionality](#usage)
 3. [Testing](#testing)
 4. [Function Reference](#function-reference)
+
     * [libkv::get](#get)
     * [libkv::put](#put)
     * [libkv::delete](#delete)
@@ -22,11 +27,9 @@
     * [libkv::supports](#supports)
     * [libkv::pop_error](#pop_error)
     * [libkv::provider](#provider)
-    * [libkv::watch](#watch)
-    * [libkv::watchtree](#watchtree)
-    * [libkv::newlock](#newlock)
 
 5. [Development - Guide for contributing to the module](#development)
+
     * [Acceptance Tests - Beaker env variables](#acceptance-tests)
 
 ## Description
@@ -54,11 +57,10 @@ libkv currently supports the following providers:
 
 With the intention to support the following:
 * `etcd` - Allows connectivity to an existing etcd service
-* `simp6-legacy` - Implements the SIMP 6 legacy file storage api. 
-* `file` - Implements a non-ha flat file storage api.
+* `simp6-legacy` - Implements the SIMP 6 legacy file storage api.
+* `file` - Implements a non-HA flat file storage api.
 
-This module is a component of the [System Integrity Management
-Platform](https://github.com/NationalSecurityAgency/SIMP), a
+This module is a component of the [System Integrity Management Platform](https://simp-project.com), a
 compliance-management framework built on Puppet.
 
 If you find any issues, they may be submitted to our [bug
@@ -70,9 +72,9 @@ As an example, you can use the following to store hostnames, and then read all
 the known hostnames from consul and generate a hosts file:
 
 ```puppet
-libkv::put("/hosts/${::clientcert}", $::ipaddress)
+libkv::put("/hosts/${facts['clientcert']}", $facts['ipaddress'])
 
-$hosts = libkv::list("/hosts")
+$hosts = libkv::list('/hosts')
 $hosts.each |$host, $ip | {
   host { $host:
     ip => $ip,
@@ -105,7 +107,7 @@ libkv::url: 'consul://127.0.0.1:8500/puppet/%{trusted.extensions.pp_department}/
 
 Manual and automated tests require a shim to kick off Consul inside of Docker,
 before running.  Travis is programmed to run the shim.  To do so manually,
-first ensure you have [set up Docker](http://simp.readthedocs.io/en/latest/getting_started_guide/ISO_Build/Environment_Preparation.html#set-up-docker) properly.
+first ensure you have [set up Docker](https://simp.readthedocs.io/en/stable/getting_started_guide/Installation_Options/ISO/ISO_Build/Environment_Preparation.html#set-up-docker) properly.
 
 Next, run the shim:
 
@@ -128,319 +130,197 @@ $ bundle exec rake spec
 
 Connects to the backend and retrieves the data stored at **key**
 
-
-
-
-
 `Any $data = libkv::get(String key)`
 
-
-*Returns:*
-Any
+*Returns:* Any
 
 *Usage:*
 
-
 <pre lang="ruby">
- $database_server = libkv::get("/database/${::fqdn}")
- class { "wordpress":
- 	db_host => $database_server,
+ $database_server = libkv::get("/database/${facts['fqdn']}")
+ class { 'wordpress':
+   db_host => $database_server,
  }
 </pre>
-
-
-
-
 
 
 <h3><a id="put">libkv::put</a></h3>
 
 Sets the data at `key` to the specified `value`
 
+`Boolean $succeeded = libkv::put(String key, Any value)`
 
-
-
-
-`Boolean $suceeeded = libkv::put(String key, Any value)`
-
-
-*Returns:*
-Boolean
+*Returns:* Boolean
 
 *Usage:*
 
-
 <pre lang="ruby">
-libkv::put("/hosts/${::fqdn}", "${::ipaddress}")
+libkv::put("/hosts/${facts['fqdn']}", "${facts['ipaddress']}")
 </pre>
-
-
-
-
 
 
 <h3><a id="delete">libkv::delete</a></h3>
 
 Deletes the specified `key`. Must be a single key
 
+`Boolean $succeeded = libkv::delete(String key)`
 
-
-
-
-`Boolean $suceeeded = libkv::delete(String key)`
-
-
-*Returns:*
-Boolean
+*Returns:* Boolean
 
 *Usage:*
 
-
 <pre lang="ruby">
-$response = libkv::delete("/hosts/${::fqdn}")
-
+$response = libkv::delete("/hosts/${facts['fqdn']}")
 </pre>
-
-
-
-
 
 
 <h3><a id="exists">libkv::exists</a></h3>
 
 Returns true if `key` exists
 
-
-
-
-
 `Boolean $exists = libkv::exists(String key)`
 
-
-*Returns:*
-Boolean
+*Returns:* Boolean
 
 *Usage:*
 
-
 <pre lang="ruby">
- if (libkv::exists("/hosts/${::fqdn}") == true) {
- 	notify { "/hosts/${::fqdn} exists": }
+ if libkv::exists("/hosts/${facts['fqdn']}") {
+   notify { "/hosts/${facts['fqdn']} exists": }
  }
 </pre>
-
-
-
-
 
 
 <h3><a id="list">libkv::list</a></h3>
 
 Lists all keys in the folder named `key`
 
-
-
-
-
 `Hash $list = libkv::list(String key)`
 
-
-*Returns:*
-Hash
+*Returns:* Hash
 
 *Usage:*
-
 
 <pre lang="ruby">
  $list = libkv::list('/hosts')
  $list.each |String $host, String $ip| {
- 	host { $host:
- 		ip => $ip,
- 	}
+   host { $host:
+     ip => $ip,
+   }
  }
 </pre>
-
-
-
-
 
 
 <h3><a id="deletetree">libkv::deletetree</a></h3>
 
 Deletes the whole folder named `key`. This action is inherently unsafe.
 
-
-
-
-
 `Boolean $succeeded = libkv::deletetree(String key)`
 
-
-*Returns:*
-Boolean
+*Returns:* Boolean
 
 *Usage:*
 
-
 <pre lang="ruby">
-$response = libkv::deletetree("/hosts")
-
+$response = libkv::deletetree('/hosts')
 </pre>
-
-
-
-
 
 
 <h3><a id="atomic_create">libkv::atomic_create</a></h3>
 
-Store `value` in `key`, but only if key does not exist already, and do so atomically
+Store `value` in `key` atomically, but only if key does not already exist
 
+`Boolean $succeeded = libkv::atomic_create(String key, Any value)`
 
-
-
-
-`Boolean $suceeeded = libkv::atomic_create(String key, Any value)`
-
-
-*Returns:*
-Boolean
+*Returns:* Boolean
 
 *Usage:*
 
-
 <pre lang="ruby">
  $id = rand(0,2048)
- $result = libkv::atomic_create("/serverids/${::fqdn}", $id)
+ $result = libkv::atomic_create("/serverids/${facts['fqdn']}", $id)
  if ($result == false) {
- 	$serverid = libkv::get("/serverids/${::fqdn}")
+   $serverid = libkv::get("/serverids/${facts['fqdn']}")
  } else {
- 	$serverid = $id
+   $serverid = $id
  }
- notify("the server id of ${serverid} is indempotent!") 
+ notify("the server id of ${serverid} is idempotent!")
 </pre>
-
-
-
-
 
 
 <h3><a id="atomic_delete">libkv::atomic_delete</a></h3>
 
 Delete `key`, but only if key still matches the value of `previous`
 
+`Boolean $succeeded = libkv::atomic_delete(String key, Hash previous)`
 
-
-
-
-`Boolean $suceeded = libkv::atomic_delete(String key, Hash previous)`
-
-
-*Returns:*
-Boolean
+*Returns:* Boolean
 
 *Usage:*
 
-
 <pre lang="ruby">
- $previous = libkv::atomic_get("/env/${::fqdn}")
- $result = libkv::atomic_delete("/env/${::fqdn}", $previous)
- 
+ $previous = libkv::atomic_get("/env/${facts['fqdn']}")
+ $result = libkv::atomic_delete("/env/${facts['fqdn']}", $previous)
 </pre>
-
-
-
-
 
 
 <h3><a id="atomic_get">libkv::atomic_get</a></h3>
 
 Get the value of key, but return it in a hash suitable for use with other atomic functions
 
-
-
-
-
 `Hash $previous = libkv::atomic_get(String key)`
 
-
-*Returns:*
-Hash
+*Returns:* Hash
 
 *Usage:*
 
-
 <pre lang="ruby">
- $previous = libkv::atomic_get("/env/${::fqdn}")
- notify { "previous value is ${previous["value"]}": }
- 
+ $previous = libkv::atomic_get("/env/${facts['fqdn']}")
+ notify { "previous value is ${previous['value']}": }
 </pre>
-
-
-
-
 
 
 <h3><a id="atomic_put">libkv::atomic_put</a></h3>
 
 Set `key` to `value`, but only if the key is still set to `previous`
 
+`Boolean $succeeded = libkv::atomic_put(String key, Any value, Hash previous)`
 
-
-
-
-`Boolean $suceeeded = libkv::atomic_put(String key, Any value, Hash previous)`
-
-
-*Returns:*
-Boolean
+*Returns:* Boolean
 
 *Usage:*
 
-
 <pre lang="ruby">
  $newvalue = 'new'
- $previous = libkv::atomic_get("/env/${::fqdn}")
- $result = libkv::atomic_put("/env/${::fqdn}", $newvalue, $previous)
+ $previous = libkv::atomic_get("/env/${facts['fqdn']}")
+ $result = libkv::atomic_put("/env/${facts['fqdn']}", $newvalue, $previous)
  if ($result == true) {
- 	$real = $newvalue
+   $real = $newvalue
  } else {
- 	$real = libkv::get("/env/${::fqdn}")
+   $real = libkv::get("/env/${facts['fqdn']}")
  }
- notify { "I updated to $real atomically!": }
- 
+ notify { "I updated to ${real} atomically!": }
 </pre>
-
-
-
-
 
 
 <h3><a id="atomic_list">libkv::atomic_list</a></h3>
 
 List all keys in folder `key`, but return them in a format suitable for other atomic functions
 
-
-
-
-
 `Hash $list = libkv::atomic_list(String key)`
 
-
-*Returns:*
-Hash
+*Returns:* Hash
 
 *Usage:*
-
 
 <pre lang="ruby">
 # Add a host resource for everything under /hosts
 
  $list = libkv::atomic_list('/hosts')
  $list.each |String $host, Hash $data| {
- 	host { $host:
- 		ip => $data['value'],
- 	}
+   host { $host:
+     ip => $data['value'],
+   }
  }
 </pre>
 
@@ -450,146 +330,103 @@ Hash
 
  $list = libkv::atomic_list('/hosts')
  $list.each |String $host, Hash $data| {
- 	libkv::atomic_put("/hosts/${host}", "newip", $data)
+   libkv::atomic_put("/hosts/${host}", 'newip', $data)
  }
 </pre>
-
-
-
-
 
 
 <h3><a id="empty_value">libkv::empty_value</a></h3>
 
 Return an hash suitable for other atomic functions, that represents an empty value
 
-
 `Hash $empty_value = libkv::empty_value()`
 
-
-*Returns:*
-Hash
+*Returns:* Hash
 
 *Usage:*
 
-
 <pre lang="ruby">
  $empty = libkv::empty()
- $result = libkv::atomic_get("/some/key")
+ $result = libkv::atomic_get('/some/key')
  if ($result == $empty) {
- 	notify { "/some/key doesn't exist": }
+   notify { "/some/key doesn't exist": }
  }
- 
 </pre>
-
-
-
-
 
 
 <h3><a id="info">libkv::info</a></h3>
 
 Return a hash of informtion on the underlying provider. Provider specific
 
-
 `Hash $provider_information = libkv::info()`
 
-
-*Returns:*
-Hash
+*Returns:* Hash
 
 *Usage:*
-
 
 <pre lang="ruby">
  $info = libkv::info()
  notify { "libkv connection is: ${info}": }
- 
 </pre>
-
-
-
-
 
 
 <h3><a id="supports">libkv::supports</a></h3>
 
 Return an array of all supported functions
 
-
 `Array $supported_functions = libkv::supports()`
 
-
-*Returns:*
-Array
+*Returns:* Array
 
 *Usage:*
-
 
 <pre lang="ruby">
  $supports = libkv::supports()
  if ($supports in 'atomic_get') {
- 	libkv::atomic_get('/some/key')
+   libkv::atomic_get('/some/key')
  } else {
- 	libkv::get('/some/key')
+   libkv::get('/some/key')
  }
- 
 </pre>
-
-
-
-
 
 
 <h3><a id="pop_error">libkv::pop_error</a></h3>
 
 Return the error message for the last call
 
+`String $error_string = libkv::pop_error()`
+
+*Returns:* String
+
+*Usage:*
+
+<pre lang="ruby">
+ unless libkv::put("/hosts/${facts['fqdn']}", "${facts['ipaddress']}") {
+   $put_err_msg = libkv::pop_error()
+   notify { "Setting /hosts/${facts['fqdn']} failed: ${put_err_msg}": }
+ }
+</pre>
+
 
 <h3><a id="provider">libkv::provider</a></h3>
 
 Return the name of the current provider
 
-
 `String $provider_name = libkv::provider()`
 
-
-*Returns:*
-String
+*Returns:* String
 
 *Usage:*
-
 
 <pre lang="ruby">
  $provider = libkv::provider()
  notify { "libkv connection is: ${provider}": }
- 
 </pre>
-
-
-
-
-
-
-<h3><a id="watch">libkv::watch</a></h3>
-
-
-
-
-<h3><a id="watchtree">libkv::watchtree</a></h3>
-
-
-
-
-<h3><a id="newlock">libkv::newlock</a></h3>
-
-
-
 
 
 ## Development
 
-Please read our [Contribution Guide](http://simp-doc.readthedocs.io/en/stable/contributors_guide/index.html).
+Please read our [Contribution Guide](https://simp.readthedocs.io/en/stable/contributors_guide/index.html).
 
 ### Acceptance tests
 

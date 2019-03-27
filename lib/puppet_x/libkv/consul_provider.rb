@@ -242,7 +242,7 @@ libkv.load("consul") do
     if (key == nil)
       throw Exception
     end
-    # Get the value of key first. This is the only way to tell if we try to delete a key 
+    # Get the value of key first. This is the only way to tell if we try to delete a key
     response = consul_request(path: "/v1/kv" + @basepath + key, method: 'DELETE')
     if (response.class == Net::HTTPOK)
       if (response.body =~ /true/)
@@ -315,7 +315,7 @@ libkv.load("consul") do
     if (key == nil)
       throw Exception
     end
-    # Get the value of key first. This is the only way to tell if we try to delete a key 
+    # Get the value of key first. This is the only way to tell if we try to delete a key
     response = consul_request(path: "/v1/kv" + @basepath + key + "?keys", method: 'GET')
     if (response.class == Net::HTTPOK)
       true

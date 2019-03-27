@@ -1,15 +1,28 @@
 # The testing matrix considers ruby/puppet versions supported by SIMP and PE:
+#
+# https://puppet.com/docs/pe/2018.1/component_versions_in_recent_pe_releases.html
+# https://puppet.com/misc/puppet-enterprise-lifecycle
+# https://puppet.com/docs/pe/2018.1/overview/getting_support_for_pe.html
 # ------------------------------------------------------------------------------
-#  release    pup   ruby      eol
-# PE 2016.4   4.7   2.1.9  TBD (LTS)
-# PE 2016.5   4.8   2.1.9  2017-10-31
-# SIMP6.0.0   4.8   2.1.9  TBD
-# PE 2017.1   4.9   2.1.9  2017-10-31
-# PE 2017.2   4.10  2.1.9  TBD
+# Release       Puppet   Ruby   EOL
+# PE 2017.3     5.3      2.4.5  2018-12-31
+# SIMP 6.3      5.5      2.4.5  TBD***
+# PE 2018.1     5.5      2.4.5  2020-05 (LTS)***
+# PE 2019.0     6.0      2.5.1  2019-08-31^^^
+#
+# *** = Modules created for SIMP 6.3+ are not required to support Puppet < 5.5
+# ^^^ = SIMP doesn't support 6 yet; tests are info-only and allowed to fail
+
 ---
 language: ruby
 cache: bundler
 sudo: false
+
+stages:
+  - check
+  - spec
+  - name: deploy
+    if: 'tag IS present'
 
 bundler_args: --without development system_tests --path .vendor
 
@@ -24,87 +37,83 @@ addons:
 before_install:
   - rm -f Gemfile.lock
 
-jobs:
-  allow_failures:
-    - env: STRICT_VARIABLES=yes TRUSTED_NODE_DATA=yes PUPPET_VERSION="~> 5.0"
+global:
+  - STRICT_VARIABLES=yes
 
+jobs:
   include:
     - stage: check
-      rvm: 2.1.9
-      services:
-        - docker
-        - vagrant
-      before_script:
-        - ./prep_ci.sh
+      name: 'Syntax, style, and validation checks'
+      rvm: 2.4.5
+      env: PUPPET_VERSION="~> 5"
       script:
         - bundle exec rake check:dot_underscore
         - bundle exec rake check:test_file
         - bundle exec rake pkg:check_version
         - bundle exec rake metadata_lint
+        - bundle exec rake pkg:compare_latest_tag
+        - bundle exec rake pkg:create_tag_changelog
+        - bundle exec rake lint
+        - bundle exec puppet module build
 
     - stage: spec
-      rvm: 2.1.9
-      env: STRICT_VARIABLES=yes TRUSTED_NODE_DATA=yes PUPPET_VERSION="~> 5.0"
-      services:
-        - docker
-        - vagrant
-      before_script:
-        - ./prep_ci.sh
+      name: 'Puppet 5.3 (PE 2017.3)'
+      rvm: 2.4.5
+      env: PUPPET_VERSION="~> 5.3.0"
+# commented out lines are for broken consul tests, which
+# will be addressed in a separate ticket
+#      services:
+#        - docker
+#        - vagrant
+#      before_script:
+#        - spec/support/prep_ci.sh
       script:
         - bundle exec rake spec
 
     - stage: spec
-      rvm: 2.1.9
-      env: STRICT_VARIABLES=yes TRUSTED_NODE_DATA=yes PUPPET_VERSION="~> 4.10.0"
-      services:
-        - docker
-        - vagrant
-      before_script:
-        - ./prep_ci.sh
+      rvm: 2.4.5
+      name: 'Puppet 5.5 (SIMP 6.3, PE 2018.1)'
+      env: PUPPET_VERSION="~> 5.5.0"
+#      services:
+#        - docker
+#        - vagrant
+#      before_script:
+#        - spec/support/prep_ci.sh
       script:
         - bundle exec rake spec
 
     - stage: spec
-      rvm: 2.1.9
-      env: STRICT_VARIABLES=yes TRUSTED_NODE_DATA=yes PUPPET_VERSION="~> 4.9.2"
-      services:
-        - docker
-        - vagrant
-      before_script:
-        - ./prep_ci.sh
+      name: 'Latest Puppet 5.x'
+      rvm: 2.4.5
+      env: PUPPET_VERSION="~> 5.0"
+#      services:
+#        - docker
+#        - vagrant
+#      before_script:
+#        - spec/support/prep_ci.sh
       script:
         - bundle exec rake spec
 
     - stage: spec
-      rvm: 2.1.9
-      env: STRICT_VARIABLES=yes TRUSTED_NODE_DATA=yes PUPPET_VERSION="~> 4.8.2"
-      services:
-        - docker
-        - vagrant
-      before_script:
-        - ./prep_ci.sh
+      name: 'Latest Puppet 6.x'
+      rvm: 2.5.1
+      env: PUPPET_VERSION="~> 6.0"
+#      services:
+#        - docker
+#        - vagrant
+#      before_script:
+#        - spec/support/prep_ci.sh
       script:
         - bundle exec rake spec
 
-    - stage: spec
-      rvm: 2.1.9
-      env: STRICT_VARIABLES=yes TRUSTED_NODE_DATA=yes PUPPET_VERSION="~> 4.7.0"
-      services:
-        - docker
-        - vagrant
-      before_script:
-        - ./prep_ci.sh
-      script:
-        - bundle exec rake spec
-
-    # This needs to be last since we have an acceptance test
     - stage: deploy
-      rvm: 2.1.9
+      rvm: 2.4.5
       script:
         - true
       before_deploy:
         - "export PUPMOD_METADATA_VERSION=`ruby -r json -e \"puts JSON.parse(File.read('metadata.json')).fetch('version')\"`"
         - '[[ $TRAVIS_TAG =~ ^simp-${PUPMOD_METADATA_VERSION}$|^${PUPMOD_METADATA_VERSION}$ ]]'
+
       deploy:
         - provider: releases
           api_key:
@@ -119,5 +128,4 @@ jobs:
             secure: "JJzYG4y54kvOS6utZpBKlUxRTKjjjeAViPD7/r8NKxvOhpPwXpWra7s9PuSka2EXL++5kDjeT7yIQa9vLSGW7FUwjC+mnpPuCvSP9vW8iTw18vrMjOfGMCJXS9IlOaZRL8vN+8BZ1tOxId8pwlakhrOVIHp9z7lew5Aa1rgH7aSaGFjPYe1lmdTlb1kodUJZJGwuToKBQJHchbcHq08tmaSx06Z7HcuG/Ali/y94o9m1IMeXyjXnV+GHcxFGCK60nQWNQB2DXZgQfl13/Eg3G5z1Xty8rPmW+zXSbqcDqpJtiqz3r9pcPb1tdvSLxz5OgVunLBWDBwUbHAL1RhldUIV1tV3Gm0HGhndrA5tWtNCE271mC7zp7c5CeX8YcAuxl4Fv87Zpit6MATsdweWTsYLxixBuorMdpa/H5zqHbxo8uc4frkaro4904474XSLXh3DwLzpUuNnUR7RXo37U07DimZWf4S1gr6MYHOutbZHHcTNV+BXo25heKgbL+0Ou72nQsEmoNVEm4LF0a4kRiG6EfwHWizXLCNlsEoZDZq+eyfmx/mOkpiXICYVorf5uPPnPL+GEwJ9Z0HRD0RYuqdgsfc6CxSUfkpwZtrdJZUzLB5osOWuqArj+J8E0WQ2dfNBHmydezaex2Se4tyELumM53utS5qW/N008Er4grCk="
           on:
             tags: true
-            rvm: 2.1.9
             condition: '($SKIP_FORGE_PUBLISH != true)'
