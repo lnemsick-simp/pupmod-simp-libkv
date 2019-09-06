@@ -196,6 +196,7 @@ def datatype_testspec
       :class => 'TrueClass',
       :puppet_type => 'Boolean',
     },
+=begin
     # Test Float
     {
       :key => 'test_float',
@@ -223,6 +224,7 @@ def datatype_testspec
       :class => 'Hash',
       :puppet_type => 'Hash',
     },
+=end
   ]
 end
 

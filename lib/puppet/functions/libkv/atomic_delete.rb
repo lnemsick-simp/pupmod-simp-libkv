@@ -45,7 +45,7 @@ Puppet::Functions.create_function(:'libkv::atomic_delete') do
       libkv = catalog.libkv
     rescue NoMethodError
       lib_dir = File.dirname(File.dirname(File.dirname(File.dirname("#{__FILE__}"))))
-      filename = File.join(lib_dir, 'puppet_x', 'libkv', 'libkv.rb')
+      filename = File.join(lib_dir, 'puppet_x', 'libkv', 'loader.rb')
       if File.exists?(filename)
         catalog.instance_eval(File.read(filename), filename)
         libkv = catalog.libkv

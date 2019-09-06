@@ -59,7 +59,7 @@ describe 'libkv::put' do
           result = call_function("libkv::get", params)
           expect(result.class.to_s).to eql(klass)
         end
-        it "should create the value '#{hash[:value]}' for /put/#{hash[:key]}" do
+        it "should create the value #{hash[:value].inspect} for /put/#{hash[:key]}" do
           params = {
              'key' => "/put/" + hash[:key],
              'value' => hash[:value],
