@@ -1,7 +1,12 @@
 # vim: set expandtab ts=2 sw=2:
 
-libkv.load("mock") do
+provider_class = Class.new do
+  def self.name
+    'mock'
+  end
+
   def initialize(url, auth)
+puts "mock constructed"
     @root = {};
     @mutex = Mutex.new();
     @sequence = 1;
@@ -11,6 +16,7 @@ libkv.load("mock") do
     if (params.key?('key') == false)
         raise "key must be specified"
     end
+puts "mock::get with key=#{params['key'].inspect}"
     key = params['key'];
     value = @root[key];
     if value.class == Hash
@@ -24,12 +30,14 @@ libkv.load("mock") do
       retval["result"]
     end
   end
+
   def atomic_get(params)
     retval = {}
     key = params['key'];
     if (key == nil)
       throw Exception
     end
+puts "mock::get with key=#{params['key'].inspect}"
     if (@root.key?(key))
       retval["result"] = @root[key];
     else
@@ -51,6 +59,7 @@ libkv.load("mock") do
     if (value == nil)
       throw Exception
     end
+puts "mock::put with key=#{params['key'].inspect} value=#{params['value'].inspect}"
     @mutex.synchronize do
       @sequence += 1;
       @root[key] = {
@@ -72,6 +81,7 @@ libkv.load("mock") do
     if (key == nil)
       throw Exception
     end
+puts "mock::atomic_put with key=#{params['key'].inspect} value=#{params['value'].inspect}"
     value = params['value'];
     previous = params['previous'];
     @mutex.synchronize do
@@ -95,6 +105,7 @@ libkv.load("mock") do
     end
   end
   def atomic_create(params)
+puts "mock::atomic_create with key=#{params['key'].inspect} value=#{params['value'].inspect}"
     empty = empty_value()
     atomic_put(params.merge({ 'previous' => empty}))
   end
@@ -105,6 +116,7 @@ libkv.load("mock") do
       throw Exception
     end
     key = params['key']
+puts "mock::delete with key=#{params['key'].inspect}"
     @mutex.synchronize do
       @sequence += 1;
       if (@root.key?(key))
@@ -130,6 +142,7 @@ libkv.load("mock") do
       throw Exception
     end
     previous = params['previous']
+puts "mock::atomic_delete with key=#{params['key'].inspect} previous=#{params['previous'].inspect}"
     # if previous == nil
     #  previous = empty_value()
     # end
@@ -159,6 +172,7 @@ libkv.load("mock") do
       throw Exception
     end
     key = params['key']
+puts "mock::exists with key=#{params['key'].inspect}"
     @mutex.synchronize do
       retval["result"] = @root.key?(key)
     end
@@ -174,6 +188,7 @@ libkv.load("mock") do
       raise "'key' must be specified"
     end
     key = params['key']
+puts "mock::exists with key=#{params['key'].inspect}"
     hash = @root.select do |k, v|
       if (k =~ Regexp.new(key + '/'))
         true
@@ -200,6 +215,7 @@ libkv.load("mock") do
       raise "'key' must be specified"
     end
     key = params['key']
+puts "mock::atomic_list with key=#{params['key'].inspect}"
     hash = @root.select do |k, v|
       if (k =~ Regexp.new(key + '/'))
         true
@@ -221,6 +237,7 @@ libkv.load("mock") do
     end
   end
   def deletetree(params)
+puts "mock::deletetree params=#{params}"
     retval = {}
     if (params['debug'] == true)
       retval
@@ -241,6 +258,7 @@ libkv.load("mock") do
     end
   end
   def provider(params = {})
+puts "mock::provider params=#{params}"
     retval = {}
     retval["result"] = "mock"
     if (params['debug'] == true)
@@ -251,6 +269,7 @@ libkv.load("mock") do
   end
 
   def info(params = {})
+puts "mock::provider params=#{params}"
     retval = {}
     retval["result"] = { "sequence" => @sequence }
     if (params['debug'] == true)
@@ -261,6 +280,7 @@ libkv.load("mock") do
   end
 
   def supports(params = {})
+puts "mock::supports params=#{params}"
     retval = {}
     retval["result"] = [
       "delete",

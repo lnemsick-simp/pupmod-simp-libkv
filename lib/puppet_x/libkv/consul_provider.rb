@@ -1,8 +1,13 @@
 # vim: set expandtab ts=2 sw=2:
-require 'net/http'
-require 'uri'
-require 'base64'
-libkv.load("consul") do
+provider_class = Class.new do
+  require 'net/http'
+  require 'uri'
+  require 'base64'
+
+  def self.name
+    'consul'
+  end
+
   def initialize(url, auth)
     @uri = URI.parse(url)
     @resturi = URI.parse(url)
