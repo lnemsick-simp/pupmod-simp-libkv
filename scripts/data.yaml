@@ -4,16 +4,30 @@ functions:
   get:
     :examplereturn: data
     :retval:
+#FIXME should this be NotUndef?  When would nil be an allowed value?
       :type: 'Any'
       :description: 'The value in the underlying backing store'
     :description: 'Connects to the backend and retrieves the data stored at **key**'
-    :softfail: nil
+    :softfail_value: nil
     :signatures:
+      full_hash:
+        :args:
+          - :type: 'Hash'
+            :name: 'params'
+            :description:
+              'FILL-ME-IN'
       v1:
         :args:
-          - :type: 'String'
+          - :type: 'String[1]'
             :name: 'key'
             :description: 'The key to get'
+    :validation:
+      - "unless params.key?('key')\n
+           raise ArgumentError.new(\"ERROR: libkv::get - Missing 'key' param\")\n
+         end"
+      - "if params['key'].strip.empty?\n
+           raise ArgumentError.new(\"ERROR: libkv::get - Invalid 'key' param '#{params['key']}'\")\n
+         end"
     :examples:
       - "
          $database_server = libkv::get(\"/database/${facts['fqdn']}\")\n
@@ -26,16 +40,26 @@ functions:
       :type: 'Boolean'
       :description: 'Whether the backend set operation succeeded'
     :description: 'Sets the data at `key` to the specified `value`'
-    :softfail: 'false'
+    :softfail_value: 'false'
     :signatures:
+      full_hash:
+        :args:
+          - :type: 'Hash'
+            :name: 'params'
+            :description:
+              'FILL-ME-IN'
       v1:
         :args:
-          - :type: 'String'
+          - :type: 'String[1]'
             :name: 'key'
             :description: 'The key to be set'
-          - :type: 'Any'
+          - :type: 'NotUndef'
             :name: 'value'
             :description: 'The value of the key'
+    :validation:
+      "unless params.key?('key') && !params['key'].strip.empty? \n
+         raise ArgumentError.new(\"ERROR: libkv::put - Missing valid 'key' param')
+       end"
     :examples:
       - "libkv::put(\"/hosts/${facts['fqdn']}\", \"${facts['ipaddress']}\")"
   delete:
@@ -44,13 +68,23 @@ functions:
       :type: 'Boolean'
       :description: 'Whether the backend operation succeeded'
     :description: 'Deletes the specified `key`. Must be a single key'
-    :softfail: 'false'
+    :softfail_value: 'false'
     :signatures:
+      full_hash:
+        :args:
+          - :type: 'Hash'
+            :name: 'params'
+            :description:
+              'FILL-ME-IN'
       v1:
         :args:
-          - :type: 'String'
+          - :type: 'String[1]'
             :name: 'key'
             :description: 'The key to be deleted'
+    :validation:
+      "unless params.key?('key') && !params['key'].strip.empty? \n
+         raise ArgumentError.new(\"ERROR: libkv::delete - Missing valid 'key' param')
+       end"
     :examples:
       - "$response = libkv::delete(\"/hosts/${facts['fqdn']}\")"
   exists:
@@ -59,13 +93,23 @@ functions:
       :type: 'Boolean'
       :description: 'Whether the `key` exists in the backend'
     :description: 'Returns true if `key` exists'
-    :softfail: nil
+    :softfail_value: nil
     :signatures:
+      full_hash:
+        :args:
+          - :type: 'Hash'
+            :name: 'params'
+            :description:
+              'FILL-ME-IN'
       v1:
         :args:
-          - :type: 'String'
+          - :type: 'String[1]'
             :name: 'key'
             :description: 'The key to check'
+    :validation:
+      "unless params.key?('key') && !params['key'].strip.empty? \n
+         raise ArgumentError.new(\"ERROR: libkv::exists - Missing valid 'key' param')
+       end"
     :examples:
       - "
         if libkv::exists(\"/hosts/${facts['fqdn']}\") {\n
@@ -77,13 +121,23 @@ functions:
       :type: 'Hash'
       :description: 'Hash of key/value pairs'
     :description: 'Lists all keys in the folder named `key`'
-    :softfail: "{}"
+    :softfail_value: "{}"
     :signatures:
+      full_hash:
+        :args:
+          - :type: 'Hash'
+            :name: 'params'
+            :description:
+              'FILL-ME-IN'
       v1:
         :args:
-          - :type: 'String'
+          - :type: 'String[1]'
             :name: 'key'
             :description: 'The folder to list'
+    :validation:
+      "unless params.key?('key') && !params['key'].strip.empty? \n
+         raise ArgumentError.new(\"ERROR: libkv::list - Missing valid 'key' param')
+       end"
     :examples:
       - "
         $list = libkv::list('/hosts')\n
@@ -98,13 +152,23 @@ functions:
       :type: 'Boolean'
       :description: 'Whether the backend folder deletion operation succeeded'
     :description: 'Deletes the whole folder named `key`. This action is inherently unsafe.'
-    :softfail: 'false'
+    :softfail_value: 'false'
     :signatures:
+      full_hash:
+        :args:
+          - :type: 'Hash'
+            :name: 'params'
+            :description:
+              'FILL-ME-IN'
       v1:
         :args:
-          - :type: 'String'
+          - :type: 'String[1]'
             :name: 'key'
             :description: 'The folder to delete'
+    :validation:
+      "unless params.key?('key') && !params['key'].strip.empty? \n
+         raise ArgumentError.new(\"ERROR: libkv::deletetree - Missing valid 'key' param')
+       end"
     :examples:
       - "$response = libkv::deletetree('/hosts')"
   atomic_create:
@@ -113,16 +177,26 @@ functions:
       :type: 'Boolean'
       :description: 'Whether the backend create operation succeeded'
     :description: 'Store `value` in `key` atomically, but only if key does not already exist'
-    :softfail: "{}"
+    :softfail_value: "{}"
     :signatures:
+      full_hash:
+        :args:
+          - :type: 'Hash'
+            :name: 'params'
+            :description:
+              'FILL-ME-IN'
       v1:
         :args:
-          - :type: 'String'
+          - :type: 'String[1]'
             :name: 'key'
             :description: 'The key to be created'
-          - :type: 'Any'
+          - :type: 'NotUndef'
             :name: 'value'
             :description: 'The value of the key'
+    :validation:
+      "unless params.key?('key') && !params['key'].strip.empty? \n
+         raise ArgumentError.new(\"ERROR: libkv::get - Missing valid 'key' param')
+       end"
     :examples:
       - "
          $id = rand(0,2048)\n
@@ -140,16 +214,29 @@ functions:
       :type: 'Boolean'
       :description: 'Whether the backend delete operation succeeded'
     :description: 'Delete `key`, but only if key still matches the value of `previous`'
-    :softfail: "{}"
+    :softfail_value: "{}"
     :signatures:
+      full_hash:
+        :args:
+          - :type: 'Hash'
+            :name: 'params'
+            :description:
+              'FILL-ME-IN'
       v1:
         :args:
-          - :type: 'String'
+          - :type: 'String[1]'
             :name: 'key'
             :description: 'The key to delete'
           - :type: 'Hash'
             :name: 'previous'
             :description: 'The value in the underlying backing store'
+    :validation:
+      - "unless params.key?('key')\n
+           raise ArgumentError.new(\"ERROR: libkv::get - Missing 'key' param\")
+         end"
+      - "if params['key'].strip.empty?\n
+           raise ArgumentError.new(\"ERROR: libkv::get - Invalid 'key' param '#{params['key']}'\")
+         end"
     :examples:
       - "
          $previous = libkv::atomic_get(\"/env/${facts['fqdn']}\")\n
@@ -161,13 +248,23 @@ functions:
       :type: 'Hash'
       :description: 'Hash containing the value in the underlying backing store'
     :description: 'Get the value of key, but return it in a hash suitable for use with other atomic functions'
-    :softfail: "{}"
+    :softfail_value: "{}"
     :signatures:
+      full_hash:
+        :args:
+          - :type: 'Hash'
+            :name: 'params'
+            :description:
+              'FILL-ME-IN'
       v1:
         :args:
-          - :type: 'String'
+          - :type: 'String[1]'
             :name: 'key'
             :description: 'The key whose value is to be retreived'
+    :validation:
+      "unless params.key?('key') && !params['key'].strip.empty? \n
+         raise ArgumentError.new(\"ERROR: libkv::get - Missing valid 'key' param')
+       end"
     :examples:
       - "
          $previous = libkv::atomic_get(\"/env/${facts['fqdn']}\")\n
@@ -179,19 +276,29 @@ functions:
       :type: 'Boolean'
       :description: 'Whether the backend set operation succeeded'
     :description: 'Set `key` to `value`, but only if the key is still set to `previous`'
-    :softfail: "{}"
+    :softfail_value: "{}"
     :signatures:
+      full_hash:
+        :args:
+          - :type: 'Hash'
+            :name: 'params'
+            :description:
+              'FILL-ME-IN'
       v1:
         :args:
-          - :type: 'String'
+          - :type: 'String[1]'
             :name: 'key'
             :description: 'The key to be set'
-          - :type: 'Any'
+          - :type: 'NotUndef'
             :name: 'value'
             :description: 'The value of the key'
           - :type: 'Hash'
             :name: 'previous'
             :description: 'Hash containing the previous value of the key'
+    :validation:
+      "unless params.key?('key') && !params['key'].strip.empty? \n
+         raise ArgumentError.new(\"ERROR: libkv::get - Missing valid 'key' param')
+       end"
     :examples:
       - "
          $newvalue = 'new'\n
@@ -210,13 +317,23 @@ functions:
       :type: 'Hash'
       :description: 'Hash of key/value pairs'
     :description: 'List all keys in folder `key`, but return them in a format suitable for other atomic functions'
-    :softfail: "{}"
+    :softfail_value: "{}"
     :signatures:
+      full_hash:
+        :args:
+          - :type: 'Hash'
+            :name: 'params'
+            :description:
+              'FILL-ME-IN'
       v1:
         :args:
-          - :type: 'String'
+          - :type: 'String[1]'
             :name: 'key'
             :description: 'The folder to list'
+    :validation:
+      "unless params.key?('key') && !params['key'].strip.empty? \n
+         raise ArgumentError.new(\"ERROR: libkv::get - Missing valid 'key' param')
+       end"
     :examples:
       - "# Add a host resource for everything under /hosts\n\n
         $list = libkv::atomic_list('/hosts')\n
@@ -236,11 +353,16 @@ functions:
       :type: 'Hash'
       :description: 'Empty hash representing an empty value'
     :description: 'Return an hash suitable for other atomic functions, that represents an empty value'
-    :softfail: nil
+    :softfail_value: nil
+    :signatures:
+      full_hash:
+        :args:
+          - :type: 'Hash'
+            :name: 'params'
     :allow_empty: true
     :examples:
       - "
-         $empty = libkv::empty()\n
+         $empty = libkv::empty_value()\n
          $result = libkv::atomic_get('/some/key')\n
          if ($result == $empty) {\n
          \tnotify { \"/some/key doesn't exist\": }\n
@@ -252,7 +374,12 @@ functions:
       :type: 'Hash'
       :description: 'Provider information hash'
     :description: 'Return a hash of informtion on the underlying provider. Provider specific'
-    :softfail: "{}"
+    :softfail_value: "{}"
+    :signatures:
+      full_hash:
+        :args:
+          - :type: 'Hash'
+            :name: 'params'
     :allow_empty: true
     :examples:
       - "
@@ -265,7 +392,12 @@ functions:
       :type: 'Array'
       :description: 'Array of provider supported functions'
     :description: 'Return an array of all supported functions'
-    :softfail: "[]"
+    :softfail_value: "[]"
+    :signatures:
+      full_hash:
+        :args:
+          - :type: 'Hash'
+            :name: 'params'
     :allow_empty: true
     :examples:
       - "
@@ -283,7 +415,12 @@ functions:
       :type: 'String'
       :description: "Provider's error message for the last call"
     :description: 'Return the error message for the last call'
-    :softfail: '""'
+    :softfail_value: "''"
+    :signatures:
+      full_hash:
+        :args:
+          - :type: 'Hash'
+            :name: 'params'
     :allow_empty: true
     :examples:
       - "
@@ -298,7 +435,12 @@ functions:
       :type: 'String'
       :description: 'Provider name'
     :description: 'Return the name of the current provider'
-    :softfail: '""'
+    :softfail_value: "''"
+    :signatures:
+      full_hash:
+        :args:
+          - :type: 'Hash'
+            :name: 'params'
     :allow_empty: true
     :examples:
       - "

@@ -4,12 +4,26 @@
 #
 Puppet::Functions.create_function(:'libkv::<%= function %>') do
 
-  # @param parameters Hash of all parameters
+<% full_hash_spec = value[:signatures]['full_hash'] -%>
+<% unless full_hash_spec[:args].nil? -%>
+<%   full_hash_spec[:args].each do |argument| -%>
+<%     if value[:allow_empty] -%>
+  # @param <%= argument[:name] %> Hash containing provider configuration
+<%     else -%>
+  # @param <%= argument[:name] %> Hash containing required <%= function %> parameters
+  #   and provider configuration:
+  #   <%= argument[:description].split("\n").join("\n  #  ") %>
+<%     end -%>
+<%   end -%>
+<% end -%>
   #
   # @return [<%= value[:retval][:type] %>] <%= value[:retval][:description] %>
   #
-  # @raise [RuntimeError] if Ruby files needed for libkv operation
-  # cannot be found
+  # @raise [RuntimeError] if Ruby files needed for libkv operation cannot
+  # be found (e.g., unknown libkv provider specified)
+  #
+  # @raise [SyntaxError] if any libkv provider (Ruby) files fail to parse
+  #
   dispatch :<%= function %> do
     param 'Hash', :parameters
   end
@@ -26,18 +40,21 @@ Puppet::Functions.create_function(:'libkv::<%= function %>') do
 <% end -%>
 <% unless value[:signatures].nil? -%>
 <%   value[:signatures].each do |key, spec| -%>
+<%     next if key == 'full_hash' -%>
 
 <%     unless spec[:args].nil? -%>
 <%       spec[:args].each do |argument| -%>
-  # @param <%= argument[:name] %> <%=argument[:description] %>
+  # @param <%= argument[:name] %> <%= argument[:description] %>
 <%       end -%>
 <%     end -%>
   #
   # @return [<%= value[:retval][:type] %>] <%= value[:retval][:description] %>
   #
+  # @raise [RuntimeError] if Ruby files needed for libkv operation cannot
+  # be found (e.g., unknown libkv provider specified)
   #
-  # @raise [RuntimeError] if Ruby files needed for libkv operation
-  # cannot be found
+  # @raise [SyntaxError] if any libkv provider (Ruby) files fail to parse
+  #
   dispatch :<%= function + '_' + key %> do
 <%     unless spec[:args].nil? -%>
 <%       spec[:args].each do |argument| -%>
@@ -68,10 +85,12 @@ Puppet::Functions.create_function(:'libkv::<%= function %>') do
 <% end -%>
 
   def <%= function %>(params)
+<% unless value[:allow_empty] -%>
     # ensure all required parameters are present
     validate_params(params)
+<% end -%>
 
-    # add defaults for optional parameters
+    # add defaults for global, optional parameters
     nparams = update_params(params)
 
     # add libkv 'extension' to the catalog instance as needed
@@ -86,13 +105,17 @@ Puppet::Functions.create_function(:'libkv::<%= function %>') do
       end
     end
 
+    unless catalog.libkv.provider?(params['provider'])
+      raise("ERROR: libkv::<%= function %> - Unknown libkv provider '#{params['provider']}'")
+    end
+
     # use libkv for <%= function %> operation
     retval = nil
     begin
       retval = catalog.libkv.<%= function %>(nparams['url'], nparams['auth'], nparams);
     rescue Exception => e
       if nparams['softfail']
-        retval = []
+        retval =  <%= value[:softfail_value] %>
       else
         raise(e)
       end
@@ -102,12 +125,17 @@ Puppet::Functions.create_function(:'libkv::<%= function %>') do
   end
 
   # Add defaults for missing, optional parameters and Puppet info
+  #
   # @param input parameters (read-only)
   # @return copy of params that has been updated
   def update_params(params)
     nparams = params.dup
 
-    # determine url and auth parameters to use
+    # determine libkv provider, url and auth parameters to use
+    unless nparams.key?('provider')
+      nparams['provider'] = call_function('lookup', 'libkv::provider', { 'default_value' => 'mock' })
+    end
+
     unless nparams.key?('url')
       nparams['url'] = call_function('lookup', 'libkv::url', { 'default_value' => 'mock://' })
     end
@@ -137,9 +165,15 @@ Puppet::Functions.create_function(:'libkv::<%= function %>') do
   end
 
 
+<% unless value[:allow_empty] || !value[:validations].empty? -%>
   # check for required parameters
   # @param input parameters
-  # @raise ArgumentError if any required parameters are missing
+  # @raise ArgumentError if any required parameters are missing or invalid
   def validate_params(params)
+
+<% unless value[:allow_empty] -%>
+<% end -%>
+
+
   end
 end
