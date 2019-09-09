@@ -1,7 +1,7 @@
 # Loading this file via 'my_object.instance_eval()' does the following:
 # - Adds read and write accessors for a 'libkv' attribute to 'my_object'.
 # - Loads libkv.rb in a fashion that the anonymous libkv adapter class it
-#   contains can be accessed by 'my_object'.
+#   contains is accessible in the scope of this file.
 # - Sets the new libkv attribute of 'my_object' to a new libkv adapter
 #   instance created from the anonymous class.
 #

@@ -1,12 +1,15 @@
 # @summary libkv adapter
 #
 # Anonymous class that does the following
-# - Loads libkv provider plugins as anonymous classes
+# - Loads libkv providers (plugins) as anonymous classes
 #   - Prevents cross-environment Ruby code contamination
 #     in the puppetserver
-# - Adapts non-string values
+#   - Sadly, makes code more difficult to understand and
+#     code sharing tricky
 # - Instantiates provider instances as they are needed
-# - Serializes value data when configured
+#   - Unique instance per provider name and url requested
+# - Serializes value data when required by a provider instance
+# - Delegates actions to appropriate provider instance
 #
 simp_libkv_adapter_class = Class.new do
   attr_accessor :classes, :urls, :default_url
@@ -17,19 +20,29 @@ puts "anonymous libkv adapter class.new called in loader.rb"
     @urls = {}
     @default_url = ""
 
-    # Every file in lib/puppet_x/libkv/*_provider.rb is assumed
-    # to contain a libkv backend provider, and we load them in.
+    # Load in the libkv providers from all modules.
     #
-    # Every provider uses libkv.load() to actually define itself,
-    # which results in catalog.libkv.classes['providername'] to return
-    # the Class that implements the provider.
-    providerglob = File.dirname(File.dirname(File.dirname(File.dirname(File.dirname(__FILE__))))) + "/*/lib/puppet_x/libkv/*_provider.rb"
+    # - Every file in modules/*/lib/puppet_x/libkv/*_provider.rb is assumed
+    #   to contain a libkv backend provider.
+    # - Each provider file must contain an anonymous class that can be accessed
+    #   by a 'provider_class' local variable.
+    # - Each provider must provide the following methods:
+    #   name       - Returns the name of the provider
+    #   serialize? - Whether data should be serialized
+    #
+    # NOTE: All providers must be uniquely named.  Otherwise, only the Class
+    #       object for last provider with the same provider name will be
+    #       stored in the classes hash.
+    #
+    modules_dir = File.dirname(File.dirname(File.dirname(File.dirname(File.dirname(__FILE__)))))
+    providerglob = File.join(modules_dir, '*', 'lib', 'puppet_x', 'libkv', '*_provider.rb')
     Dir.glob(providerglob) do |filename|
       # Load provider code.  Code evaluated will set this local scope variable
       # 'provider_class' to the anonymous Class object for the provider
       # contained in the file.
       # NOTE:  'provider_class' **must** be defined prior to the eval in order
       #        to be in scope
+puts "loading provider from #{filename}"
       provider_class = nil
       self.instance_eval File.read(filename), filename
       @classes[provider_class.name] = provider_class

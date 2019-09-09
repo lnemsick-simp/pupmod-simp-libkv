@@ -6,10 +6,10 @@ provider_class = Class.new do
   end
 
   def initialize(url, auth)
-puts "mock constructed"
     @root = {};
     @mutex = Mutex.new();
     @sequence = 1;
+puts 'mock constructed'
   end
   def get(params)
     retval = {}
