@@ -1,202 +1,179 @@
 #### Table of Contents
 
 * [Terminology](#terminology)
-* [Scope]
-* [libkv Requirements](#libkv-requirements)
+* [Scope](#scope)
+* [Requirements](#requirements)
 
   * [Minimum Requirements](#minimum-requirements)
 
-    * [libkv Puppet-Function Interface](#libkv-puppet-function-interface)
-    * [libkv Backend Interface](#libkv-backend-interface)
-    * [libkv Configuration](#libkv-configuration)
-    * [libkv-Provided Plugins](#libkv-configuration)
+    * [Puppet Function API](#puppet-function-api)
+    * [Backend Plugin Adapter](#backend-plugin-adapter)
+    * [Backend Plugin API](#backend-plugin-api)
+    * [Configuration](#configuration)
+    * [libkv-Provided Plugins and Stores](#libkv-provided-plugins-and-stores)
 
   * [Future Requirements](#future-requirements)
 
-* [libkv Rollout Plan](#libkv-rollout-plan)
+* [Rollout Considerations](#rollout-considerations)
+* [Design](#design)
 
-* [libkv Function API](#libkv-function-api)
+  * [Changes from Version 0.6.X](#changes-from-version-0.6.x)
+  * [libkv Puppet Functions](#libkv-puppet-functions)
 
-  * [Overview](#FIXME)
-  * [Functions](#FIXME)
+    * [Overview](#Overview)
+    * [Common Function Options](#common-functions-options)
+    * [Functions Signatures](#functions-signatures)
 
-* [libkv Plugin API](#libkv-plugin-API)
+  * [Plugin AAPI](#libkv-plugin-API)
+  * [Plugin API](#libkv-plugin-API)
   * Overview
     * libkv adapter responsibilities
     * libkv plugin responsibilities
 
 ## Terminology
 
-* libkv - Module that provides an interface to one or more key/value stores
-  and a file-based key/value store.  The interface is comprised of
+* libkv - SIMP module that provides
 
-  * Puppet functions implemented in Ruby function API.
-  * Adapter software that provides a mechanism for loading and executing
-    key/value store interface software.
+  * a standard Puppet language API (functions) for using key/value stores
+  * adapter software that loads and uses store-specific interface software
+  * a Ruby API for the store interface software
+  * interface software to a few specific stores (file-based store to start)
+  * a file-based store
 
-* backend - A specific key/value store, e.g., Consul, Etcd, Zookeeper.
-* plugin - Pure Ruby software that interfaces with a specific backend to
+* backend - A specific key/value store, e.g., Consul, Etcd, Zookeeper, local
+  files
+* plugin - Ruby software that interfaces with a specific backend to
   affect the operations requested in libkv functions.
 
   * AKA provider.  Plugin will be used throughout this document to avoid
     confusion with Puppet types and providers.
 
-* plugin adapter - Pure Ruby software that loads, selects, and executes
-  the appropriate plugin software for a libkv function at runtime.
+* plugin adapter - Ruby software that loads, selects, and executes the
+  appropriate plugin software for a libkv function call.
 
 ## Scope
 
-This document describes design information for the second libkv prototype
-(version 0.7.0).  Major design/API changes since version 0.6.x are as follows:
+This documents libkv requirements, roll out considerations, and a
+second-iteration, protoype design to meet those requirements.
 
-* Simplified the libkv function API to be more appropriate for end users.
-
-  * Atomic functions and their helpers have been removed.  The software
-    communicating with a specific key/value store is assumed to affect atomic
-    operations in a manner appropriate for that backend.
-  * Each function that had a '_v1' signature (dispatch) has been rewritten to
-    combine the single Hash parameter signature and the '_v1' signature.  The
-    new signature has all required parameters plus an optional Hash.  This
-    change makes the required parameters explicit to the end user (e.g.,
-    a `put` operation requires a `key` and a `value`) and leverages parameter
-    validation provided natively by Puppet.
-
-* Redesigned global Hiera configuration to support more complex libkv deployment
-  scenarios.  The limited libkv Hiera configuration, `libkv::url` and
-  `libkv::auth`, has been replace with a Hash `libkv::options`, that allows
-  users to specify the following:
-
-  * global libkv options
-  * any number of backends along with configuration specific to each
-  * which backend is to be used by default
-  * which backend to use for specific catalog resources (e.g., specific
-    Classes, all Defines of a specific type, specific Defines).
-
-* Standardized error handling
-
-  * Each backend plugin operation corresponding to a libkv function must
-    return a results Hash in lieu of raising an exception.
-  * The plugin adapter must catch any exceptions not handled by the plugin
-    software and convert to a failed-operation results Hash.  This includes
-    failure to load the plugin software (e.g., if an externally-provided
-    plugin has malformed Ruby.)
-  * Each libkv function must raise an exception with the error message
-    provided by the failed-operation results Hash, by default.  When
-    configured to 'softfail', instead, each function must log the error
-    message and return an appropriate failed value.
-
-
-## libkv Requirements
+## Requirements
 
 ### Minimum Requirements
 
-#### libkv Puppet-Function Interface
+#### Puppet Function API
 
-libkv must provide a Puppet-function interface that Puppet code can use to access
+libkv must provide a Puppet function API that Puppet code can use to access
 a key/value store.
 
-* The interface must provide basic key/value operations (e.g., `put`, `get`,
-  `list`, `delete`).
+* The API must provide basic key/value operations via Puppet functions
+
+  * The operations required are
+
+    * `put`
+    * `get`
+    * `delete`
+    * `list`
+    * `deletetree`
+
+  * Each operation must be fully supported by each backend.
+  * Each key-modifying operation is assumed to be implemented atomically
+    in each backend, wherever possible.
+
+    * Complexity of atomic operations has been pushed to each backend plugin
+      because that is where the complexity belongs, not in Puppet code.  Each
+      backend plugin will use the appropriate mechanisms provided natively by
+      its backend (e.g., locking, atomic methods), thereby optimizing
+      performance.
 
   * Each operation must be a unique function in the `libkv` namespace.
   * Keys must be `Strings` that can be used for directory paths.
 
-  * A key must contain only the following characters:
-      * a-z
-      * A-Z
-      * 0-9
-      * The following special characters: `._:-/`
+    * A key must contain only the following characters:
+
+        * a-z
+        * A-Z
+        * 0-9
+        * The following special characters: `._:-/`
+
     * A key must not contain '/./' or '/../' sequences.
 
   * Values must be any type that is not `Undef` (`nil`).
 
+    * This includes binary String content
+
 * The interface must support the use of one or more backends.
 
   * Each function must allow the user to optionally specify the backend
-    to use and its configuration options at runtime.
+    to use and its configuration options when called.
   * When the backend information is not specified, each function must
-    look up the information in Hieradata at runtime.
+    look up the information in Hieradata when called.
 
-* The plugin for each backend must support all the operations in this
-  interface.
+* Each function that uses a key parameter for an individual key/value pair
+  must automatically prepend the Puppet environment to that key, by default.
 
-  * Writing Puppet code is difficult otherwise!
-  * Mapping of the interface to the actual backend operations is up to
-    the discretion of the plugin.
-
-* The interface must automatically prepend the Puppet environment to each key,
-  by default, but provide a mechanism to disable this operation via libkv
-  configuration.
-
-  Example: `libkv::put('mykey', 'some value')` in the `production`
-  environment would transform `'mykey'` to `'production/mykey'`,
-  before sending the request to the appropriate backend plugin.
+  * Stored information is generally isolated per Puppet environment.
+  * To support storage of truly global information in a backend, the interface
+    must provide a mechnism to disable this prepending.
+  * Prepending will not apply to `list` or `deletetree` operations.
 
 * The interface must allow additional metadata in the form of a Hash to
   be persisted/retrieved with the key-value pair.
 
-#### libkv Backend Interface
+#### Backend Plugin Adapter
 
-libkv must provide a backend interface (plugin) API, a mechanism for
-loading plugin code, a mechanism for instantiating plugin objects and
-persisting them through the lifetime of a catalog instance, and a mechanism
-to use these objects to implement the Puppet-function interface.
+libkv must provide a backend plugin adapter that
 
-FIXME: plugin adapter discussion looks like a mix of design and requirements
-* The plugin adapter is responsible for managing and using plugin code.
+  * loads plugin code provided by libkv and other modules with each catalog
+    compile
+  * instantiates plugins when needed
+  * persists plugins through the lifetime of the catalog compile
 
-  * It must be be written in pure Ruby.
-  * It must be loaded and constructed in a way that prevents
-    cross-environment contamination.
-  * It must load plugin software in a way that prevents cross-environment
-    contamination.
-  * An instance of it must be maintained over the lifetime of a catalog instance.
-  * It must construct plugin objects and retain them through the life of
-    a catalog instance.
-  * It must select the appropriate plugin object to use for each function call.
-  * It must serialize data to be persisted into a common format and
-    then deserialize upon retrieval.
+    * Most for efficient for plugins that maintain a connection with a
+      key/value service.
 
-    * Transformation done only in one place, instead of in each plugin (DRY).
-    * Prevents value objects from being modified by plugin function code.
-      This is especially of concern of complex Hash objects, for which
-      there is no deep copy mechanism.  (`Hash.dup` does *not* deep copy!)
+  * selects and uses the appropriate plugin for each libkv Puppet function call
+    during the catalog compile.
 
-  * It must safely handle unexpected plugin failures, including failures to
-    load (e.g., malformed Ruby).
+* The plugin adapter must be available to all functions in the Puppet
+  function API.
+* The plugin adapter must be loaded and constructed in a way that prevents
+  cross-environment contamination, when loaded in a puppetserver.
+* The plugin adapter must load plugin software in a way that prevents
+  cross-environment contamination, when loaded in a puppetserver.
+* The plugin adapter must be fault tolerant against any malformed plugin
+  software.
 
-* Any module may provide a libkv plugin.
-* All plugins must be written in pure Ruby.
+  * It must continue to operate with valid plugins, when a malformed plugin
+    fails to load.
 
-  * This allows stateful objects with a lifetime corresponding to that of
-    a catalog instance to be created. For plugins that maintain a connection
-    with a key/value service, this is more efficient.
+* The plugin adapter must allow multiple instances of an individual
+  plugin to be instantiated and used during the catalog compile.
 
-* All plugin code must be able to be loaded in a fashion that prevents
-  cross-environment code contamination, when loaded in the puppetserver.
+#### Backend Plugin API
 
-  * This requires dynamically loaded classes that are either anonymous or
-    that contain generated class names.  Both options result in necessarily
-    fugly code.
+libkv must supply a backend plugin API that provides
 
-* All plugins must conform to the plugin API.
-* All plugins must be uniquely named.
-* The plugin API must provide:
-
-  * Details on the code structure required for prevention of cross-environment
-    contamination-free
+  * Public API method signatures, including the constructor
   * Description of any universal plugin options that must be supported
   * Ability to specify plugin-specific options
-  * Public API method signatures, including the constructor
   * Explicit policy on error handling (how to report errors, what information
     the messages should contain for plugin proper identification, whether
     exceptions are allowed)
+  * Details on the code structure required for prevention of cross-environment
+    contamination
   * Documentation requirements
   * Testing requirements
 
-#### libkv Configuration
+Each plugin must conform to the plugin API and satisfy the following
+general requirements:
 
-* Users must be able to specify the following in Hiera (see example):
+* All plugins must be uniquely named.
+* All plugins must allow multiple instances of the plugin to
+  be instantiated and used in a single catalog compile.
+
+#### Configuration
+
+* Users must be able to specify the following in Hiera:
 
   * global libkv options
   * any number of backends along with configuration specific to each
@@ -209,7 +186,6 @@ FIXME: plugin adapter discussion looks like a mix of design and requirements
   calls.
 * The libkv options in individual libkv Puppet function calls take precedence
   over those specified in Hiera.
-
 
 Example libkv Hiera configuration:
 
@@ -277,68 +253,30 @@ Example libkv Hiera configuration:
 ```
 
 
-#### libkv-Provided Plugins
+#### libkv-Provided Plugins and Stores
 
-* libkv must provide a String-only, file-based plugin that can be used for
-  `simplib::passgen()` passwords currently stored in the puppetserver cache
-  directory, PKI secrets currently stored in `/var/simp/environments`, and
-  Kerberos secrets stored in `/var/simp/environments`.
+* libkv must provide a file-based key/store for a local file system and its
+  corresponding plugin
 
-    * This plugin is sometimes referred to as a legacy plugin.
-    * For each key/value pair, the plugin must write to/read from a unique
+    * The plugin software may implement the key/store functionality.
+    * For each key/value pair, the store must write to/read from a unique
       file for that pair on the local file system (i.e., file on the
       puppetserver host).
 
-      * The root path for files defaults to `/var/simp/libkv/file_string_only`.
-      * The key specifies the path relative to the root path.
-      * The plugin must create the directory tree, when it is absent.
-      * *External* code must make sure the puppet user has appropriate access
-        to root path.
-      * Having each file contain a single key allows easy auditing of
-        creation, access, and modification to individual keys.
-
-    * The plugin must write a String value exactly as is to file in the `put`
-      operation, and then properly restore it in the `get` and `list`
-      operations.
-
-      * The plugin must handle string values with binary content.
-      * Any metadata specified in the `put` request will be discarded and
-        not available in a `get` or `list` request.
-
-    * For plugin `put`, `get`, and `list` operations for any values that are
-      not of type String the plugin behavior is unspecified.
-
-      * The user should use a different plugin if they want to store generic
-        objects.
-
-    * The plugin `put`, `delete`, and `deletetree` operations must be
-      multi-process safe on a local file system.
-
-    * The plugin `put`, `delete`, and `deletetree` operations may be
-      multi-process safe on shared file systems, such as NFS.
-
-      * Getting this to work on specific shared filesystem types is
-        deferred to future requirements.
-
-* libkv must provide a generic file-based plugin
-
-    * For each key/value pair, the plugin must write to/read from a unique
-      file for that pair on the local file system (i.e., file on the puppetserver
-      host).
-
       * The root path for files defaults to `/var/simp/libkv/file`.
       * The key specifies the path relative to the root path.
-      * The plugin must create the directory tree, when it is absent.
+      * The store must create the directory tree, when it is absent.
       * *External* code must make sure the puppet user has appropriate access
         to root path.
       * Having each file contain a single key allows easy auditing of
-        creation, access, and modification to individual keys.
+        individual key creation, access, and modification.
 
-    * The plugin must write a JSON representation of the value and optional
+    * The plugin must persist a JSON representation of the value and optional
       metadata to file in the `put` operation, and then properly restore the
       value and metadata in the `get` and `list` operations.
 
-      * The plugin must handle string values with binary content.
+      * The plugin must handle string values with binary content that is not
+        UTF-8 compliant.
       * This *ASSUMES* all the types within Puppet are built upon primitives for
         which a meaningful `.to_json` method exists.
       * Although JSON is not a compact/efficient representation, it is
@@ -350,15 +288,17 @@ Example libkv Hiera configuration:
     * The plugin `put`, `delete`, and `deletetree` operations may be
       multi-process safe on shared file systems, such as NFS.
 
-      * Getting this to work on specific shared filesystem types is
+      * Getting this to work on specific shared file system types is
         deferred to future requirements.
+
+* libkv may provide a Consul-based plugin
 
 ### Future Requirements
 
-This is a placeholder for additional libkv requirements which will be
-addressed, once it moves beyond the prototype stage.
+This is a placeholder for miscellaneous, additional libkv requirements
+to be addressed, once it moves beyond the prototype stage.
 
-* libkv must support audit operations on the key/value store
+* libkv must support audit operations on a key/value store
 
   * Auditing information to be provided must include:
 
@@ -377,18 +317,18 @@ addressed, once it moves beyond the prototype stage.
 * libkv should provide a script to import existing
   `simplib::passgen()` passwords stored in the puppetserver cache
   directory, PKI secrets stored in `/var/simp/environments`, and Kerberos secrets
-  stored in `/var/simp/environments` to the libkv local file backend.
+  stored in `/var/simp/environments` to a backend.
 * libkv local file backend must encrypt each file it maintains.
 * libkv local file backend must ensure multi-process-safe `put`,
-  `delete`, and `deletetree` operations on a <insert shared filesystem
+  `delete`, and `deletetree` operations on a <insert shared file system
    du jour> file system.
 
-## libkv Rollout Plan
+## Rollout Considerations
 
-Understanding how the libkv functionality will be rolled out to
-replace functionality in `simplib::passgen()``, the `pki`
-Class, and the `krb5` Class informs the design.  To that end, this
-section describes the expected rollout for each replacement.
+Understanding how the libkv functionality will be rolled out to replace
+functionality in `simplib::passgen()``, the `pki` Class, and the `krb5` Class
+informs the libkv requirements and design.  To that end, this section describes
+the expected rollout for each replacement.
 
 ### simplib::passgen() conversion to libkv
 
@@ -420,55 +360,98 @@ Conversions of the `pki` and `krb5` Classes to use libkv entails switching
 from using `File` resources with the `source` set to `File` resources with
 `content` set to the output of `libkv::get(xxx)``.
 
-* `krb5` keytabs are binary data which may require use of Puppet Binary()
-  operations.
+* `pki` and `krb5` Classes conversions are independent.
+* `krb5` keytabs are binary data which may be a problem in Puppet 5.
 
-  * TODO Understand how get binary data persisted in a `File` resource.
-    `Binary` and `binary_file` are supposed to facilitate that, but
-    they have bugs and the fixes may not be in Puppet 5.  See regression
-    discussion and the end of tickets.puppetlabs.com/browse/PUP-3600.
-    and tickets.pupopetlabs.com/browse/PUP-9110
+  * See discussions in tickets.puppetlabs.com/browse/PUP-9110,
+    tickets.puppetlabs.com/browse/PUP-3600, and
+    tickets.puppetlabs.com/browse/SERVER-1082.
 
-* It may make sense to allow users to opt into these changes with a new
+* It may make sense to allow users to opt into these changes via a new
   `libkv` class parameter.
+
+  * Class code would contain both ways of managing File content.
+  * User could fall back to non-libkv mechanisms if any unexpected problems
+    were encountered.
+
 * It may be worthwhile to have a `simp_options::libkv` parameter to enable
   use of libkv wherever it is used in SIMP modules.
 * May want to provide a migration script that users can run to import existing
   secrets into the key/value store prior to enabling this option.
 
-## libkv Function API
+## Design
 
-### Overview
+### Changes from Version 0.6.X
+
+Major design/API changes since version 0.6.X are as follows:
+
+* Simplified the libkv function API to be more appropriate for end users.
+
+  * Atomic functions and their helpers have been removed.  The software
+    communicating with a specific key/value store is assumed to affect atomic
+    operations in a manner appropriate for that backend.
+  * Each function that had a '_v1' signature (dispatch) has been rewritten to
+    combine the single Hash parameter signature and the '_v1' signature.  The
+    new signature has all required parameters plus an optional Hash.  This
+    change makes the required parameters explicit to the end user (e.g.,
+    a `put` operation requires a `key` and a `value`) and leverages parameter
+    validation provided natively by Puppet.
+
+* Redesigned global Hiera configuration to support more complex libkv deployment
+  scenarios.  The limited libkv Hiera configuration, `libkv::url` and
+  `libkv::auth`, has been replace with a Hash `libkv::options`, that allows
+  users to specify the following:
+
+  * global libkv options
+  * any number of backends along with configuration specific to each
+  * which backend is to be used by default
+  * which backend to use for specific catalog resources (e.g., specific
+    Classes, all Defines of a specific type, specific Defines).
+
+* Standardized error handling
+
+  * Each backend plugin operation corresponding to a libkv function must
+    return a results Hash in lieu of raising an exception.
+  * The plugin adapter must catch any exceptions not handled by the plugin
+    software and convert to a failed-operation results Hash.  This includes
+    failure to load the plugin software (e.g., if an externally-provided
+    plugin has malformed Ruby.)
+  * Each libkv function must raise an exception with the error message
+    provided by the failed-operation results Hash, by default.  When
+    configured to 'softfail', instead, each function must log the error
+    message and return an appropriate failed value.
+
+### libkv Puppet Functions
+
+#### Overview
 
 libkv Puppet functions provide access to a key/value store from an end-user
 perspective.  This means the API provides simple operations and does not
-expose the complexities of concurrency.  So, a manifest simply calls functions
+expose the complexities of concurrency.  So, Puppet code simply calls functions
 which, by default, either work or fail. No complex logic needs to be built into
-a manifest.
+that code.
 
-For cases in which it may be appropriate for a manifest to handle error cases,
-itself, instead of failing a catalog compilation, the libkv Puppet function API
-does allow each function to be executed in a `softfail` mode.  The `softfail`
-mode can also be set globally for a specific backend.  When `softfail` mode is
-enabled, each function will return a result object that indicates whether the
-operation succeeded, and, for retrieval operations, an appropriate null/empty
-value.
+For cases in which it may be appropriate for Puppet code to handle error
+cases itself, instead of failing a catalog compilation, the libkv Puppet
+function API does allow each function to be executed in a `softfail` mode.
+The `softfail` mode can also be set globally for a specific backend.  When
+`softfail` mode is enabled, each function will return a result object even
+when the operation failed.
 
-This simple API only works if the complexity of key/value modifying operations
-is pushed to the backend plugins.
+Each function body will affect the operation requested by doing the following:
 
-  * The plugins are expected to provide atomic key-modifying operations
-    automatically, wherever possible, using backend-specific lock/or
-    atomic operations mechanisms.
-  * A plugin may choose to cache data for key quering operations, keeping
-    in mind each plugin instance only remains active for the duration of the
-    catalog instance (compile).
-  * Each plugin may choose to offer a retry option, to minimize failed catalog
-    compiles when connectivity to its remote backend is spotty.
+* validate parameters beyond what is provided by Puppet
+* lookup global backend configuration in Hiera
+* merge the global backend configuration with specific backend configuration
+  provided in options passed to the function (specific configuration takes
+  priority)
+* load and instantiate the plugin adapter, if it has not already been loaded
+* delegate operations to that adapter
+* return the results or raise, as appropriate
 
-### libkv Options Configuration
+#### Common Function Options
 
-Each libkv Puppet function will have an optional `options` Hash parameter.
+Each libkv Puppet function will have an optional `backend_options` Hash parameter.
 This parameter can be used to specify global libkv options and/or the specific
 backend to use (with or without backend-specific configuration).  This Hash
 will be merged with the configuration found in the `libkv::options`` Hiera
@@ -477,58 +460,169 @@ entry.
 The standard options available are as follows:
 
 * `softfail`: Boolean.  When set to `true`, each function will return a results
-  oject that indicates whether the operation succeeded, and, for retrieval
-  operations, an appropriate null/empty object in lieu of failing.  The default
-  is `false`.
+  Hash, even when the operation has failed.  When the operation that failed
+  was a retrieval operation (e.g., `get`), the returned value will be an
+  appropriate empty/null object.  Defaults to `false`.
 * `environment`: String. When set to a non-empty string, the value is prepended
-  to the `key` parameter.  Should only be set to an empty string when the key
+  to the `key` parameter in individual key/value operations (i.e., all but
+  `list` or `deletetree`).  Should only be set to an empty string when the key
   being accessed is truly global.  Defaults to the Puppet environment for the
-  agent.
-* `backend`: String.  Name of the backend in the 'backends' sub-Hash of
-  the merged options Hash.  When absent, the libkv function will look for
-  a backend whose name matches the calling Class, specific Define, or Define
-  type.  If no match is found, it will use the 'default' backend.
+  node.
+* `backend`: String.  Name of the backend to use.  Must be a key in the
+  'backends' sub-Hash of the merged options Hash.  When absent, the libkv
+   function will look for a backend whose name matches the calling Class,
+   specific Define, or Define type.  If no match is found, it will use the
+   'default' backend.
 
-TODO:  examples using the configuration example in
-[libkv Configuration](#libkv-configuration)
+### Function Signatures
 
-* In `myclass` class manifest:
+* libkv::put: Sets the data at `key` to a `value` and any corresponding
+  metadata in the configured backend.
 
-  ```ruby
+  * `Boolean libkv::put(String key, Any value, Hash metadata={}, Hash options={})`
+  * Raises upon backend failure, unless `options['softfail']` is `true`
+  * Returns `true` when backend operation succeeds
+  * Returns `false` when backend operation fails and `options['softfail']`
+    is `true`
 
-    result = libkv::get('key', { 'softfail' => true })
+* libkv::get: Retrieves the value and any metadata stored at `key` from the
+  configured backend.
 
-  ```
+  * `Enum[Hash,Undef] libkv::get(String key, Hash options={})`
+  * Raises upon backend failure, unless `options['softfail']` is `true`
+  * Returns a Hash when the backend operation succeeds
 
-  The function call will use the  backend configuration from
-  `libkb::options['backends']['default']`.  This is resolves to
-  `libkv::backend::file`.
+    * Hash will have a 'value' key containing the retrieved value of type
+      `Any`
+    * Hash will have a 'meta' key containing a Hash with any metadata for the
+      key
 
-* In `pki` class manifest:
+  * Returns `nil` , when the backend operation fails and `options['softfail']`
+    is `true`
 
-  ```ruby
-
-    result = libkv::get('key')
-  ```
-
-  The function call will use the  backend configuration from
-  `libkb::options['backends']['default.Class[Pki]']`.  This is resolves to
-  `libkv::backend::consul`.
-
-* TODO Define examples
-
-### Functions
-
-* libkv::put: Sets the data at `key` to a `value` in the configured backend.
-* libkv::get: Retrieves the data stored at `key` from the configured backend.
 * libkv::delete: Deletes a `key` from the configured backend.
+
+  * `Boolean libkv::delete(String key, Hash options={})`
+  * Raises upon backend failure, unless `options['softfail']` is `true`
+  * Returns `true` when backend operation succeeds
+  * Returns `false` when backend operation fails and `options['softfail']`
+    is `true`
+
 * libkv::exists: Returns whether the `key` exists in the configured backend.
+
+  * `Enum[Boolean,Undef] libkv::exists(String key, Hash options={})`
+  * Raises upon backend failure, unless `options['softfail']` is `true`
+  * Returns key status (`true` or `false`), when the backend operation succeeds
+  * Returns `nil`, when the backend operation fails and `options['softfail']`
+    is `true`
+
 * libkv::list: Returns a list of all keys in a folder.
-* libkv::deletetree: Deletes the whole folder named `key` from the configured
-  backend.
+
+  * `Enum[Hash,Undef] libkv::list(String keydir, Hash options={})`
+  * Raises upon backend failure, unless `options['softfail']` is `true`
+  * Returns a Hash when the backend operation succeeds
+
+    * Each key in the returned Hash will be a key (`String`) in the backend
+    * Each value in the returned Hash will be a Hash that itself contains a
+      'value' key with the value (`Any`) and a 'meta' key with any metadata
+      for the key (`Hash`)
+    * Example
+
+      ```ruby
+
+        { 'key1' => {'value' => 'hello', meta => { ... } },
+          'key2' => {'value' => 'Bob', meta => { ... } } }
+
+      ```
+  * Returns `nil`, when the backend operation fails and `options['softfail']`
+    is `true`
+
+* libkv::deletetree: Deletes a whole folder from the configured backend.
+
+  * `Boolean libkv::deletetree(String keydir, Hash options={})`
+  * Raises upon backend failure, unless `options['softfail']` is `true`
+  * Returns `true` when backend operation succeeds
+  * Returns `false` when backend operation fails and `options['softfail']`
+    is `true`
+
+### libkv plugin adapter
+
+An instance of the plugin adapter must be maintained over the lifetime of
+a catalog compile. Puppet does not provide a mechanism to create such an
+object.  So, we will create the object in pure Ruby and attach it to the
+catalog object for use by all libkv Puppet functions. This must be done
+in a fashion that prevents cross-environment contamination when Ruby code
+is loaded into the puppetserver....a requirement that necessarily adds
+complexity to both the plugin adapter and the plugins it loads.
+
+There are two mechanisms for creating environment-contained adapter and 
+plugin code:
+
+* Create anonymous classes accessible by predefined local variables upon
+  in an `instance_eval()`
+* `load` classes that start anonymous but then set their name to a
+  constant that includes the environment.
+  (See https://www.onyxpoint.com/fixing-the-client-side-of-multi-tenancy-in-the-puppet-server/)
+
+In either case the plugin adapter and plugin code must be written in pure
+Ruby and reside in the 'libkv/lib/puppet_x/libkv' directory.
+
+The documentation here will not focus on the specific method to be used,
+but on the design:  the responsibilities and API of the plugin adapter.
 
 
-## libkv Plugins
+  * It must construct plugin objects and retain them through the life of
+    a catalog instance.
+  * It must select the appropriate plugin object to use for each function call.
+
+* The plugin adapter must serialize data to be persisted into a common
+  format and then deserialize upon retrieval.
+    * Transformation done only in one place, instead of in each plugin (DRY).
+    * Prevents value objects from being modified by plugin function code.
+      This is especially of concern of complex Hash objects, for which
+      there is no deep copy mechanism.  (`Hash.dup` does *not* deep copy!)
+
+  * It must safely handle unexpected plugin failures, including failures to
+    load (e.g., malformed Ruby).
+
+* The plugin adapter must serialize data to be persisted into a common
+  format and then deserialize upon retrieval.
+    * Transformation done only in one place, instead of in each plugin (DRY).
+    * Prevents value objects from being modified by plugin function code.
+      This is especially of concern of complex Hash objects, for which
+      there is no deep copy mechanism.  (`Hash.dup` does *not* deep copy!)
+
+  * It must safely handle unexpected plugin failures, including failures to
+    load (e.g., malformed Ruby).
+
+## Plugin API
+
+The simple libkv function API has relegated the complexity of atomic key/value
+modifying operations to the backend plugins.
+
+* The plugins are expected to provide atomic key-modifying operations
+  automatically, wherever possible, using backend-specific lock/or
+  atomic operations mechanisms.
+* A plugin may choose to cache data for key quering operations, keeping
+  in mind each plugin instance only remains active for the duration of the
+  catalog instance (compile).
+* Each plugin may choose to offer a retry option, to minimize failed catalog
+  compiles when connectivity to its remote backend is spotty.
+
+As described in []#() All plugins must be written in pure Ruby.
+
+
+* All plugin code must be able to be loaded in a fashion that prevents
+  cross-environment code contamination, when loaded in the puppetserver.
+
+  * This requires dynamically loaded classes that are either anonymous or
+    that contain generated class names.  Both options result in necessarily
+    fugly code.
+* The plugin for each backend must support all the operations in this API.
+
+  * Writing Puppet code is difficult otherwise!
+  * Mapping of the interface to the actual backend operations is up to
+    the discretion of the plugin.
 
 Overview
 * The plugin adapter is responsible for managing and using plugin code.
@@ -637,7 +731,6 @@ $ bundle exec rake spec
 <h3><a id="get">libkv::get</a></h3>
 
 
-`Any $data = libkv::get(String key)`
 
 *Returns:* Any
 
