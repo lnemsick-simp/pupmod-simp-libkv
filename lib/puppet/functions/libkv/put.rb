@@ -1,113 +1,94 @@
-# Sets the data at `key` to the specified `value`
+# Sets the data at `key` to the specified `value` in the configured backend.
+#  Optionally sets metadata along with the `value`.
 #
 # @author https://github.com/simp/pupmod-simp-libkv/graphs/contributors
 #
 Puppet::Functions.create_function(:'libkv::put') do
 
-  # @param parameters Hash of all parameters
-  #
-  # @return [Boolean] Whether the backend set operation succeeded
-  #
-  # @raise [RuntimeError] if Ruby files needed for libkv operation
-  # cannot be found
-  dispatch :put do
-    param 'Hash', :parameters
-  end
-
   # @param key The key to be set
   # @param value The value of the key
+  # @param metadata Additional information to be persisted
+  # @param options Hash that specifies global libkv options and/or
+  #   the specific backend to use (with or without backend-specific
+  #   configuration).  Will be merged with `libkv::options`.
   #
-  # @return [Boolean] Whether the backend set operation succeeded
+  #   Standard options to specify:
   #
+  #   * `softfail`: Boolean.  When set to `true`, this function will return
+  #     a result, even when the operation has failed.  Otherwise, the function
+  #     will fail when the backend operation fails. Defaults to `false`.
+  #   * `environment`: String. When set to a non-empty string, the value is
+  #     prepended to the `key` parameter in this operation.  Should only be set
+  #     to an empty string when the key being accessed is truly global.
+  #     Defaults to the Puppet environment for the node.
+  #   * `backend`: String.  Name of the backend to use.  Must be a key in the
+  #     'backends' sub-Hash of the merged options Hash.  When absent, this
+  #      function will look for a backend whose name matches the calling Class,
+  #      specific Define, or Define type.  If no match is found, it will use
+  #      the 'default' backend.
+  #   * `backends`: Hash.  Hash of backend configuration in which the
+  #     key is the name of an instance of a backend.
   #
-  # @raise [RuntimeError] if Ruby files needed for libkv operation
-  # cannot be found
-  dispatch :put_v1 do
-    param 'String', :key
-    param 'Any', :value
+  #     * Merged hash must have backend configuration for a 'default' key.
+  #     * Each backend configuration must be a Hash with the following
+  #       required keys:
+  #
+  #       * `id`:  Unique name for the instance of the backend. (Same backend
+  #         type can be configured differently).
+  #       * `type`:  Backend type.  Returned value of `<plugin class>.name()`.
+  #
+  # @raise [ArgumentError] If the key is invalid, the requested backend does
+  #   not exist in `libkv::options`, or the plugin for the requested backend
+  #   is not available.
+  #
+  # @raise [LoadError] If the libkv adapter cannot be loaded
+  #
+  # @raise [RuntimeError] If the backend operation fails, unless
+  #   `options['softfail']` is `true`.
+  #
+  # @return [Boolean] `true` when backend operation succeeds; `false` when the
+  #   backend operation fails and `options['softfail']` is `true`
+  #
+  dispatch :put do
+    required_param 'String[1]', :key
+    required_param 'NotUndef',  :value
+
+    # metadata is distinct from backend_options, so there can be
+    # no confusion with backend options and this key-specific,
+    # additional data
+    optional_param 'Hash',      :metadata
+    optional_param 'Hash',      :backend_options
   end
 
-  def put_v1(key, value)
-    params = {}
-    params['key'] = key
-    params['value'] = value
-
-    put(params)
-  end
-
-  def put(params)
-    # ensure all required parameters are present
-    validate_params(params)
-
-    # add defaults for optional parameters
-    nparams = update_params(params)
+  def put(key, value, metadata={}, backend_options={})
+    # key validation difficult to do via a type alias, so validate via function
+    call_function('libkv::validate_key', key)
 
     # add libkv 'extension' to the catalog instance as needed
-    catalog = closure_scope.find_global_scope.catalog
-    unless catalog.respond_to?(:libkv)
-      lib_dir = File.dirname(File.dirname(File.dirname(File.dirname("#{__FILE__}"))))
-      filename = File.join(lib_dir, 'puppet_x', 'libkv', 'loader.rb')
-      if File.exists?(filename)
-        catalog.instance_eval(File.read(filename), filename)
-      else
-        raise("Internal error: libkv::put unable to load #{filename}: File not found")
-      end
+    call_function('libkv::add_libkv')
+
+    # determine backend configuration using backend_options, `libkv::options`,
+    # and the list of backends for which plugins have been loaded
+    begin
+      merged_options = call_function( 'libkv::get_backend_config',
+        backend_options, catalog.libkv.backends)
+    rescue RuntimeError => e
+      msg = "libkv Configuration Error for libkv::put with key=#{key}: #{e.message}"
+      raise ArgumentError.new(msg)
     end
 
     # use libkv for put operation
-    retval = nil
-    begin
-      retval = catalog.libkv.put(nparams['url'], nparams['auth'], nparams);
-    rescue Exception => e
-      if nparams['softfail']
-        retval = []
+    backend_result = catalog.libkv.put(key, value, metadata, merged_options)
+    success = backend_result[:success]
+    unless success
+      err_msg =  "libkv::put with key=#{key}: #{backend_result[:err_msg]}"
+      if  merged_options['softfail']
+        Puppet.warning(err_msg)
       else
-        raise(e)
+        raise(err_msg)
       end
     end
 
-    return retval;
-  end
-
-  # Add defaults for missing, optional parameters and Puppet info
-  # @param input parameters (read-only)
-  # @return copy of params that has been updated
-  def update_params(params)
-    nparams = params.dup
-
-    # determine url and auth parameters to use
-    unless nparams.key?('url')
-      nparams['url'] = call_function('lookup', 'libkv::url', { 'default_value' => 'mock://' })
-    end
-
-    unless nparams.key?('auth')
-      nparams['auth'] = call_function('lookup', 'libkv::auth', { 'default_value' => nil })
-    end
-
-    # add Puppet info to params
-    unless nparams.key?('environment')
-      nparams['environment'] = closure_scope.lookupvar('::environment')
-    end
-
-    unless nparams.key?('user')
-      nparams['user'] = Puppet.settings[:user] ? Puppet.settings[:user] : 'puppet'
-    end
-
-    unless nparams.key?('group')
-      nparams['group'] = Puppet.settings[:group] ? Puppet.settings[:group] : 'group'
-    end
-
-    unless nparams.key?('puppet_vardir')
-      nparams['group'] = Puppet.settings[:vardir] ? Puppet.settings[:vardir] : 'vardir'
-    end
-
-    nparams
-  end
-
-
-  # check for required parameters
-  # @param input parameters
-  # @raise ArgumentError if any required parameters are missing
-  def validate_params(params)
+    success
   end
 end

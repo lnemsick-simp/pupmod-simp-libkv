@@ -16,24 +16,34 @@ Puppet::Functions.create_function(:'libkv::validate_key') do
 
   # @param key libkv key
   #
-  # @raise [RuntimeError] if validation fails
+  # @raise [ArgumentError] if validation fails
   #
   # @example Passing
-  #   libkv::validate_key('/looks/like/a/file/path')
-  #   libkv::validate_key('/looks/like/a/directory/path/')
-  #   libkv::validate_key('/simp-simp_snmpd:password.auth')
+  #   libkv::validate_key('looks/like/a/file/path')
+  #   libkv::validate_key('looks/like/a/directory/path/')
+  #   libkv::validate_key('simp-simp_snmpd:password.auth')
   #
   # @example Failing
-  #   libkv::validate_key('/${special}/chars/not/allowed!'}
-  #   libkv::validate_key('missing-initial-slash')
-  #   libkv::validate_key('/looks/like/an/./unexpanded/linux/path')
-  #   libkv::validate_key('/looks/like/another/../unexpanded/linux/path')
+  #   libkv::validate_key('${special}/chars/not/allowed!'}
+  #   libkv::validate_key('looks/like/an/./unexpanded/linux/path')
+  #   libkv::validate_key('looks/like/another/../unexpanded/linux/path')
   #
   dispatch :validate_key do
     param 'String[1]', :key
   end
 
   def validate_key(key)
+    char_regex = /^([a-zA-Z0-9._:\-\/])+$/
+    unless (key =~ char_regex)
+      msg = "key '#{name}' contains unsupported characters.  Allowed set=[a-zA-Z0-9._:-/]"
+      raise(msg)
+    end
+
+    dot_regex = /\/\.\.?\//
+    if (key =~ dot_regex)
+      msg = "key '#{name}' contains disallowed '/./' or '/../' sequence"
+      raise(msg)
+    end
   end
 
 end

@@ -31,7 +31,7 @@ end
 # Load libkv.rb.  The code evaluated will set this local scope variable
 # 'simp_libkv_adapter_class' to an anonymous Class object for the libkv adapter
 # contained in the file.
-# NOTE:  'simp_libkv_adapter_class' **must** be defined prior to the eval
+# NOTE:  'simp_libkv_adapter_class' **MUST** be defined prior to the eval
 #        in order to be in scope
 simp_libkv_adapter_class = nil
 self.instance_eval(

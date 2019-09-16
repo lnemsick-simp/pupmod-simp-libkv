@@ -77,7 +77,7 @@ a key/value store.
 
   * Each operation must be fully supported by each backend.
   * Each key-modifying operation is assumed to be implemented atomically
-    in each backend, wherever possible.
+    via each plugin backend.
 
     * Complexity of atomic operations has been pushed to each backend plugin
       because that is where the complexity belongs, not in Puppet code.  Each
@@ -97,9 +97,15 @@ a key/value store.
 
     * A key must not contain '/./' or '/../' sequences.
 
-  * Values must be any type that is not `Undef` (`nil`).
+  * Values must be any type that is not `Undef` (`nil`) subject to the
+    following constraints:
 
-    * This includes binary String content
+    * All values of type String must contain valid UTF-8 or have an encoding
+      of ASCII-8BIT (i.e., be a Binary Puppet type).
+
+    * All String objects contained within a complex value type (e.g., Hash,
+      Array), must be valid UTF-8. Complete support of binary String content
+      is deferred.
 
 * The interface must support the use of one or more backends.
 
@@ -128,7 +134,7 @@ libkv must provide a backend plugin adapter that
   * instantiates plugins when needed
   * persists plugins through the lifetime of the catalog compile
 
-    * Most for efficient for plugins that maintain a connection with a
+    * Most efficient for plugins that maintain connections with a
       key/value service.
 
   * selects and uses the appropriate plugin for each libkv Puppet function call
@@ -153,7 +159,8 @@ libkv must provide a backend plugin adapter that
 
 libkv must supply a backend plugin API that provides
 
-  * Public API method signatures, including the constructor
+  * Public API method signatures, including the constructor and a
+    method that reports the plugin type (typically backend it supports)
   * Description of any universal plugin options that must be supported
   * Ability to specify plugin-specific options
   * Explicit policy on error handling (how to report errors, what information
@@ -167,9 +174,16 @@ libkv must supply a backend plugin API that provides
 Each plugin must conform to the plugin API and satisfy the following
 general requirements:
 
-* All plugins must be uniquely named.
+* All plugins must be unique.
+
+  * Files can be named the same in different modules, but their reported
+    plugin types must be unique.
+
 * All plugins must allow multiple instances of the plugin to
   be instantiated and used in a single catalog compile.
+
+  * This requirement allows the same plugin to be used for distinct
+    configurations to the same type of backend.
 
 #### Configuration
 
@@ -191,13 +205,26 @@ Example libkv Hiera configuration:
 
 ```yaml
 
-  libkv::backend::consul:
-    # id is a required key and must be unique across all backend configurations
-    id: consul
+  libkv::backend::file:
+    # id is a required key and must be unique for all configurations
+    # for a specific type of backend
+    id: file
 
-    # plugin is a required key and must be unique across all backend plugins.
-    # However, the same plugin may be used for multiple backend configurations.
-    plugin: consul
+    # type is a required key and must be unique across all backend plugins.
+    # However, the same type may be used for multiple backend configurations.
+    type: file
+
+    # plugin-specific configuration
+    root_path: "/var/simp/libkv/file"
+
+  libkv::backend::alt_file:
+    id: alt_file
+    type: file
+    root_path: "/some/other/path"
+
+  libkv::backend::consul:
+    id: consul
+    type: consul
 
     request_timeout_seconds: 15
     num_retries: 1
@@ -209,24 +236,17 @@ Example libkv Hiera configuration:
       cert_file:  "/path/to/server.crt"
       key_file:   "/path/to/server.key"
 
-  libkv::backend::file:
-     id: file
-     plugin: file
-     root_path: "/var/simp/libkv/file"
-
-  libkv::backend::alt_file:
-     id: alt_file
-     plugin: file
-     root_path: "/some/other/path"
-
   # Hash of backend configuration to be used to lookup the appropriate backend
-  # to use in libkv functions.  Each function has an optional options Hash
-  # parameter that will be deep merged with this Hash.  If the merged Hash
-  # contains the key 'backend', it will specify which backend to use in the
-  # 'backends' sub-Hash below.  If the merged Hash does not contain the
-  # 'backend' key, the libkv function  will look for a backend whose name
-  # matches the calling Class, specific Define, or Define type.  If no
-  # match is found, it will use the 'default' backend.
+  # to use in libkv functions.
+  #
+  # Each function has an optional backend_options Hash parameter that will be
+  # deep merged with this Hash.
+  # *  If the merged Hash contains the key 'backend', it will specify which
+  #    backend to use in the 'backends' sub-Hash below.
+  # *  If the merged Hash does not contain the 'backend' key, the libkv function
+  #    will look for a backend whose name matches the calling Class, specific
+  #    Define, or Define type.
+  # *  If no Class/Define match is found, it will use the 'default' backend.
   libkv::options:
     # global options
     environment: "%{server_facts.environment}"
@@ -240,11 +260,11 @@ Example libkv Hiera configuration:
       #  pki Class resource
       'default.Class[Pki]':           "%{alias('libkv::backend::consul')}"
 
-      # all mydefine Define resources not fully specified
-      'default.Mydefine':             "%{alias('libkv::backend::alt_file')}"
-
-      # 'myinstance' mydefine Define resource
+      # specific 'myinstance' mydefine Define resource
       'default.Mydefine[Myinstance]': "%{alias('libkv::backend::consul')}"
+
+      # all other (not fully specified) mydefine Define resources
+      'default.Mydefine':             "%{alias('libkv::backend::alt_file')}"
 
       consul:                         "%{alias('libkv::backend::consul')}"
       file:                           "%{alias('libkv::backend::file')}"
@@ -271,16 +291,14 @@ Example libkv Hiera configuration:
       * Having each file contain a single key allows easy auditing of
         individual key creation, access, and modification.
 
-    * The plugin must persist a JSON representation of the value and optional
-      metadata to file in the `put` operation, and then properly restore the
-      value and metadata in the `get` and `list` operations.
+    * The plugin must persist the value and optional metadata to file in the
+      `put` operation, and then properly restore the value and metadata in the
+       `get` and `list` operations.
 
-      * The plugin must handle string values with binary content that is not
-        UTF-8 compliant.
-      * This *ASSUMES* all the types within Puppet are built upon primitives for
-        which a meaningful `.to_json` method exists.
-      * Although JSON is not a compact/efficient representation, it is
-        universally parsable.
+      * The plugin must handle a value of type String that has ASCII-8BIT
+        encoding (binary data).
+      * The plugin (prototype only) is not required to handle ASCII-8BIT-encoded
+        Strings within more complex value types (Arrays, Hashes).
 
     * The plugin `put`, `delete`, and `deletetree` operations must be
       multi-process safe on a local file system.
@@ -322,6 +340,12 @@ to be addressed, once it moves beyond the prototype stage.
 * libkv local file backend must ensure multi-process-safe `put`,
   `delete`, and `deletetree` operations on a <insert shared file system
    du jour> file system.
+
+* libkv must handle Binary objects (Strings with ASCII-8BIT encoding) that
+  are embedded in complex Puppet data types such as Arrays and Hashes.
+
+  * This includes Binary objects in the value and/or metadata of any
+    given key.
 
 ## Rollout Considerations
 
@@ -459,8 +483,8 @@ entry.
 
 The standard options available are as follows:
 
-* `softfail`: Boolean.  When set to `true`, each function will return a results
-  Hash, even when the operation has failed.  When the operation that failed
+* `softfail`: Boolean.  When set to `true`, each function will return results,
+  even when the operation has failed.  When the operation that failed
   was a retrieval operation (e.g., `get`), the returned value will be an
   appropriate empty/null object.  Defaults to `false`.
 * `environment`: String. When set to a non-empty string, the value is prepended
@@ -476,10 +500,10 @@ The standard options available are as follows:
 
 ### Function Signatures
 
-* libkv::put: Sets the data at `key` to a `value` and any corresponding
-  metadata in the configured backend.
+* libkv::put: Sets the data at `key` to a `value` in the configured backend.
+  Optionally sets metadata along with the `value`.
 
-  * `Boolean libkv::put(String key, Any value, Hash metadata={}, Hash options={})`
+  * `Boolean libkv::put(String key, NotUndef value, Hash metadata={}, Hash backend_options={})`
   * Raises upon backend failure, unless `options['softfail']` is `true`
   * Returns `true` when backend operation succeeds
   * Returns `false` when backend operation fails and `options['softfail']`
@@ -488,21 +512,21 @@ The standard options available are as follows:
 * libkv::get: Retrieves the value and any metadata stored at `key` from the
   configured backend.
 
-  * `Enum[Hash,Undef] libkv::get(String key, Hash options={})`
+  * `Enum[Hash,Undef] libkv::get(String key, Hash backend_options={})`
   * Raises upon backend failure, unless `options['softfail']` is `true`
   * Returns a Hash when the backend operation succeeds
 
     * Hash will have a 'value' key containing the retrieved value of type
       `Any`
-    * Hash will have a 'meta' key containing a Hash with any metadata for the
-      key
+    * Hash may have a 'metadata' key containing a Hash with any metadata
+      for the key
 
   * Returns `nil` , when the backend operation fails and `options['softfail']`
     is `true`
 
 * libkv::delete: Deletes a `key` from the configured backend.
 
-  * `Boolean libkv::delete(String key, Hash options={})`
+  * `Boolean libkv::delete(String key, Hash backend_options={})`
   * Raises upon backend failure, unless `options['softfail']` is `true`
   * Returns `true` when backend operation succeeds
   * Returns `false` when backend operation fails and `options['softfail']`
@@ -510,7 +534,7 @@ The standard options available are as follows:
 
 * libkv::exists: Returns whether the `key` exists in the configured backend.
 
-  * `Enum[Boolean,Undef] libkv::exists(String key, Hash options={})`
+  * `Enum[Boolean,Undef] libkv::exists(String key, Hash backend_options={})`
   * Raises upon backend failure, unless `options['softfail']` is `true`
   * Returns key status (`true` or `false`), when the backend operation succeeds
   * Returns `nil`, when the backend operation fails and `options['softfail']`
@@ -518,7 +542,7 @@ The standard options available are as follows:
 
 * libkv::list: Returns a list of all keys in a folder.
 
-  * `Enum[Hash,Undef] libkv::list(String keydir, Hash options={})`
+  * `Enum[Hash,Undef] libkv::list(String keydir, Hash backend_options={})`
   * Raises upon backend failure, unless `options['softfail']` is `true`
   * Returns a Hash when the backend operation succeeds
 
@@ -539,7 +563,7 @@ The standard options available are as follows:
 
 * libkv::deletetree: Deletes a whole folder from the configured backend.
 
-  * `Boolean libkv::deletetree(String keydir, Hash options={})`
+  * `Boolean libkv::deletetree(String keydir, Hash backend_options={})`
   * Raises upon backend failure, unless `options['softfail']` is `true`
   * Returns `true` when backend operation succeeds
   * Returns `false` when backend operation fails and `options['softfail']`
@@ -633,41 +657,13 @@ Overview
     upon retrieval.
   * Safely handle unexpected plugin failures.
 
--------------------------------------------------------------------
-ORIGINAL README CONTENT
+* persisted in JSON
+      * This *ASSUMES* all the types within Puppet are built upon primitives for
+        which a meaningful `.to_json` method exists.
+      * Although JSON is not a compact/efficient representation, it is
+        universally parsable.
 
-libkv is an abstract library that allows puppet to access a distributed key
-value store, like consul or etcd. This library implements all the basic
-key/value primitives, get, put, list, delete. It also exposes any 'check and
-set' functionality the underlying store supports. 
-This library supports
-loading 'provider' modules that exist in other modules, and provides a first
-class api.
-
-libkv uses lookup to store authentication information. This information can
-range from ssl client certificates, access tokens, or usernames and passwords.
-It is exposed as a hash named libkv::auth, and will be merged by default. The
-keys in the auth token are passed as is to the provider, and can vary between
-providers. Please read the documentation on configuring 'libkv::auth' for each
-provider
-
-libkv currently supports the following providers:
-
-* `mock` - Useful for testing, as it provides a kv store that is destroyed
-           after each catalog compilation
-* `consul` - Allows connectivity to an existing consul service
-
-With the intention to support the following:
-* `etcd` - Allows connectivity to an existing etcd service
-* `simp6-legacy` - Implements the SIMP 6 legacy file storage api.
-* `file` - Implements a non-HA flat file storage api.
-
-This module is a component of the [System Integrity Management Platform](https://simp-project.com), a
-compliance-management framework built on Puppet.
-
-If you find any issues, they may be submitted to our [bug
-tracker](https://simp-project.atlassian.net/).
-
+libkv file key/value store
 ## Usage
 
 As an example, you can use the following to store hostnames, and then read all
