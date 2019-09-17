@@ -216,6 +216,7 @@ Example libkv Hiera configuration:
 
     # plugin-specific configuration
     root_path: "/var/simp/libkv/file"
+    lock_timeout_seconds: 30
 
   libkv::backend::alt_file:
     id: alt_file

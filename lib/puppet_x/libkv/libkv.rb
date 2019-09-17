@@ -7,7 +7,7 @@
 #   - Sadly, makes code more difficult to understand and
 #     code sharing tricky
 # - Instantiates plugin instances as they are needed
-#   - Unique instance per plugin <id:type> requested
+#   - Unique instance per plugin {id,type} pair requested
 # - Normalizes key values
 # - Serializes value data to be persisted to common JSON format
 # - Deserializes value data to be retreived from common JSON format
@@ -17,15 +17,15 @@ simp_libkv_adapter_class = Class.new do
   require 'base64'
   require 'json'
 
-  attr_accessor :classes, :instances
+  attr_accessor :plugin_classes, :plugin_instances
 
   def initialize
     Puppet.debug 'Constructing anonymous libkv adapter class'
-    @classes = {}   # backend plugin classes;
-                    # key = backend type returned by <plugin Class>.type
-    @instances = {} # backend plugin instances;
-                    # key = <configured backend id:configured backend type>
-                    # supports multiple backend plugin instances per backend
+    @plugin_classes   = {} # backend plugin classes;
+                           # key = backend type returned by <plugin Class>.type
+    @plugin_instances = {} # backend plugin instances;
+                           # key = name assigned to the instance, <type:id>
+                           # supports multiple backend plugin instances per backend
 
     # Load in the libkv backend plugins from all modules.
     #
@@ -37,7 +37,8 @@ simp_libkv_adapter_class = Class.new do
     #   - Class methods:
     #     - type: Class method that returns the backend type
     #   - Instance methods:
-    #     - name: unique identifier <configured backend id:backend type>
+    #     - initialize: constructor
+    #     - name: assigned unique identifier
     #     - delete: delete key from the backend
     #     - deletetree: delete a folder from the backend
     #     - exists: check for existence of key in the backend
@@ -47,7 +48,7 @@ simp_libkv_adapter_class = Class.new do
     #
     # NOTE: All backend plugins must return a unique value for .type().
     #       Otherwise, only the Class object for last plugin with the same
-    #       type will be stored in the classes Hash.
+    #       type will be stored in the plugin_classes Hash.
     #
     modules_dir = File.dirname(File.dirname(File.dirname(File.dirname(File.dirname(__FILE__)))))
     plugin_glob = File.join(modules_dir, '*', 'lib', 'puppet_x', 'libkv', '*_plugin.rb')
@@ -57,12 +58,11 @@ simp_libkv_adapter_class = Class.new do
       # contained in the file.
       # NOTE:  'plugin_class' **must** be defined prior to the eval in order
       #        to be in scope and thus to contain the Class object
-
       Puppet.debug("Loading libkv plugin from #{filename}")
       begin
         plugin_class = nil
-        self.instance_eval File.read(filename), filename
-        @classes[plugin_class.type] = plugin_class
+        self.instance_eval(File.read(filename), filename)
+        @plugin_classes[plugin_class.type] = plugin_class
       rescue SyntaxError => e
         Puppet.warn("libkv plugin from #{filename} failed to load: #{e.message}"
       end
@@ -74,45 +74,78 @@ simp_libkv_adapter_class = Class.new do
   # @return list of backend plugins (i.e. their types) that have successfully
   #   loaded
   def backends
-    return classes.keys
+    return plugin_classes.keys
   end
 
+  # execute delete operation on the backend, after normalizing the key
+  #
+  # @return Empty Hash upon success and a Hash with an error message (:err_msg)
+  #   upon failure
   def delete(key, options)
     normalized_key = normalize_key(key, options)
+    instance = nil
     result = nil
     begin
       instance = plugin_instance(options)
-      result = instance.delete(normalized_key)
     rescue Exception => e
-      result = { :err_msg => "#{instance.name} Error: #{e.message}") }
+      result = { :err_msg => e.message }
+    end
+
+    if instance
+      begin
+        result = instance.delete(normalized_key)
+      rescue Exception => e
+        result = { :err_msg => "libkv #{instance.name} Error: #{e.message}") }
+      end
     end
 
     result
   end
 
+  # execute deletetree operation on the backend
+  #
+  # @return Empty Hash upon success and a Hash with an error message (:err_msg)
+  #   upon failure
   def deletetree(keydir, options)
+    instance = nil
     result = nil
     begin
       instance = plugin_instance(options)
-      result = instance.deletetree(keydir)
     rescue Exception => e
-      result = { :err_msg => "#{instance.name} Error: #{e.message}") }
+      result = { :err_msg => e.message }
+    end
+
+    if instance
+      begin
+        result = instance.deletetree(keydir)
+      rescue Exception => e
+        result = { :err_msg => "libkv #{instance.name} Error: #{e.message}") }
+      end
     end
 
     result
   end
 
   # execute exists operation on the backend, after normalizing the key
-  # @return Hash result with the presence status (:present) upon
+  #
+  # @return Hash result with the key presence status (:present) upon
   #   success or an error message (:err_msg) upon failure
   def exists(key, options)
     normalized_key = normalize_key(key, options)
+    instance = nil
     result = nil
     begin
       instance = plugin_instance(options)
-      result = instance.exists(normalized_key)
     rescue Exception => e
-      result = { :err_msg => "#{instance.name} Error: #{e.message}") }
+      result = { :err_msg => e.message }
+    end
+
+    if instance
+      begin
+        result = instance.exists(normalized_key)
+      rescue Exception => e
+        result = { :err_msg => "libkv #{instance.name} Error: #{e.message}") }
+      end
     end
 
     result
@@ -123,17 +156,25 @@ simp_libkv_adapter_class = Class.new do
   #   success or an error message (:err_msg) upon failure
   def get(key, options)
     normalized_key = normalize_key(key, options)
+    instance = nil
     result = nil
     begin
       instance = plugin_instance(options)
-      raw_result = instance.get(normalized_key)
-      if raw_result.has_key?(:value)
-        result = deserialize(raw_result[:value])
-      else
-        result = raw_result
-      end
     rescue Exception => e
-      result = { :err_msg => "#{instance.name} Error: #{e.message}") }
+      result = { :err_msg => e.message }
+    end
+
+    if instance
+      begin
+        raw_result = instance.get(normalized_key)
+        if raw_result.has_key?(:value)
+          result = deserialize(raw_result[:value])
+        else
+          result = raw_result
+        end
+      rescue Exception => e
+        result = { :err_msg => "libkv #{instance.name} Error: #{e.message}") }
+      end
     end
 
     result
@@ -141,41 +182,53 @@ simp_libkv_adapter_class = Class.new do
 
   def list(params)
     normalized_key = normalize_key(key, options)
+    instance = nil
     result = nil
     begin
       instance = plugin_instance(options)
-      raw_result = instance.list(normalized_key)
-#FIXME Need to deserialize each value
-      if raw_result.has_key?(:value)
-        result = deserialize(raw_result[:value])
-      else
-        result = raw_result
-      end
     rescue Exception => e
-      result = { :err_msg => "#{instance.name} Error: #{e.message}") }
+      result = { :err_msg => e.message }
+    end
+
+    if instance
+      begin
+        raw_result = instance.list(normalized_key)
+#FIXME Need to deserialize each value
+        if raw_result.has_key?(:value)
+          result = deserialize(raw_result[:value])
+        else
+          result = raw_result
+        end
+      rescue Exception => e
+        result = { :err_msg => "libkv #{instance.name} Error: #{e.message}") }
+      end
     end
 
     result
-  end
-
-  def list(params)
-    instance = provider_instance(params)
   end
 
   # execute put operation on the backend, after normalizing the key
   # and serializing the value+metadata
   #
-  # @return Empty Hash upon success and a Hash with an
-  #   error message (:err_msg) in cases of failure
+  # @return Empty Hash upon success and a Hash with an error message (:err_msg)
+  #   upon failure
   def put(key, value, metadata, options)
     normalized_key = normalize_key(key, options)
+    instance = nil
     result = nil
     begin
-      normalized_value = serialize(value, metadata)
       instance = plugin_instance(options)
-      result = instance.put(normalized_key, normalized_value)
     rescue Exception => e
-      result = { :err_msg => "#{instance.name} Error: #{e.message}") }
+      result = { :err_msg => e.message }
+    end
+
+    if instance
+      begin
+        normalized_value = serialize(value, metadata)
+        result = instance.put(normalized_key, normalized_value)
+      rescue Exception => e
+        result = { :err_msg => "#{instance.name} Error: #{e.message}") }
+      end
     end
 
     result
@@ -205,21 +258,24 @@ simp_libkv_adapter_class = Class.new do
   #   to one and only one backend plugin, i.e., the backend plugin class whose
   #   type method returns this value
   #
-  # The new object will be uniquely identified by a <id:type> key.
+  # The new object will be uniquely identified by a <type:id> key.
   #
   # @return an instance of a backend plugin class specified by options
-  # @raise if any required backend configuration is missing
+  # @raise if any required backend configuration is missing or the backend
+  #   plugin constructor fails
   def plugin_instance(options)
     # backend config should already have been verified, but just in case...
-    unless ( options.is_a?(Hash) &&
+    unless (
+        options.is_a?(Hash) &&
         options.has_key?('backend') &&
         options.has_key?('backends') &&
         options['backends'].is_a?(Hash) &&
         options['backends'].has_key?(options['backend']) &&
         options['backends'][ options['backend'] ].has_key?('id') &&
         options['backends'][ options['backend'] ].has_key?('type') &&
-        classes.has_key?(options['backends'][ options['backend'] ]['type'])
-      raise("libkv Internal error: Malformed backend config in options=#{options}")
+        plugin_classes.has_key?(options['backends'][ options['backend'] ]['type'])
+    )
+      raise("libkv Internal Error: Malformed backend config in options=#{options}")
     end
 
     backend = options['backend']
@@ -227,11 +283,16 @@ simp_libkv_adapter_class = Class.new do
     id = backend_config['id']
     type = backend_config['type']
 
-    instance_id = "#{id}:#{type}"
-    unless instances.has_key?(instance_id)
-      instances[instance_id] = classes[backend].new(backend_config)
+    name = "#{type}:#{id}"
+    unless plugin_instances.has_key?(name)
+      begin
+        plugin_instances[name] = plugin_classes[backend].new(name, backend_config)
+      rescue Exception => e
+        msg = "libkv Error: Unable to construct #{name}: #{e.message}"
+        raise(msg)
+      end
     end
-    instances[instance_id]
+    plugin_instances[name]
   end
 
   #FIXME This should use Puppet's serialization code so that
