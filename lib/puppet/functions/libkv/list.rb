@@ -1,42 +1,19 @@
-# Lists all keys in the folder named `key`
+# Returns a list of all keys in a folder.
 #
 # @author https://github.com/simp/pupmod-simp-libkv/graphs/contributors
 #
 Puppet::Functions.create_function(:'libkv::list') do
 
-  # @param parameters Hash of all parameters
-  #
-  # @return [Hash] Hash of key/value pairs
-  #
-  # @raise [RuntimeError] if Ruby files needed for libkv operation
-  # cannot be found
   dispatch :list do
-    param 'Hash', :parameters
-  end
-
-  # @param key The folder to list
-  #
-  # @return [Hash] Hash of key/value pairs
-  #
-  #
-  # @raise [RuntimeError] if Ruby files needed for libkv operation
-  # cannot be found
-  dispatch :list_v1 do
-    param 'String', :key
-  end
-
-  def list_v1(key)
-    params = {}
-    params['key'] = key
-
-    list(params)
+    required_param 'String[1]', :keydir
+    optional_param 'Hash',      :backend_options
   end
 
   def list(params)
     # ensure all required parameters are present
     validate_params(params)
 
-    # add defaults for optional parameters
+    # add defaults for global, optional parameters
     nparams = update_params(params)
 
     # add libkv 'extension' to the catalog instance as needed
@@ -51,13 +28,17 @@ Puppet::Functions.create_function(:'libkv::list') do
       end
     end
 
+    unless catalog.libkv.provider?(params['provider'])
+      raise("ERROR: libkv::list - Unknown libkv provider '#{params['provider']}'")
+    end
+
     # use libkv for list operation
     retval = nil
     begin
       retval = catalog.libkv.list(nparams['url'], nparams['auth'], nparams);
     rescue Exception => e
       if nparams['softfail']
-        retval = []
+        retval =  {}
       else
         raise(e)
       end
@@ -67,12 +48,17 @@ Puppet::Functions.create_function(:'libkv::list') do
   end
 
   # Add defaults for missing, optional parameters and Puppet info
+  #
   # @param input parameters (read-only)
   # @return copy of params that has been updated
   def update_params(params)
     nparams = params.dup
 
-    # determine url and auth parameters to use
+    # determine libkv provider, url and auth parameters to use
+    unless nparams.key?('provider')
+      nparams['provider'] = call_function('lookup', 'libkv::provider', { 'default_value' => 'mock' })
+    end
+
     unless nparams.key?('url')
       nparams['url'] = call_function('lookup', 'libkv::url', { 'default_value' => 'mock://' })
     end

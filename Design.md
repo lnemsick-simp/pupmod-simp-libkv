@@ -548,14 +548,16 @@ The standard options available are as follows:
 
     * Each key in the returned Hash will be a key (`String`) in the backend
     * Each value in the returned Hash will be a Hash that itself contains a
-      'value' key with the value (`Any`) and a 'meta' key with any metadata
+      'value' key with the value (`Any`) and a 'metadata' key with any metadata
       for the key (`Hash`)
     * Example
 
       ```ruby
 
-        { 'key1' => {'value' => 'hello', meta => { ... } },
-          'key2' => {'value' => 'Bob', meta => { ... } } }
+        {
+          'key1' => {'value' => 'hello', 'metadata' => { ... } },
+          'key2' => {'value' => 'Bob',   'metadata' => { ... } }
+        }
 
       ```
   * Returns `nil`, when the backend operation fails and `options['softfail']`

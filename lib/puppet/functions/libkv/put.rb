@@ -8,7 +8,7 @@ Puppet::Functions.create_function(:'libkv::put') do
   # @param key The key to be set
   # @param value The value of the key
   # @param metadata Additional information to be persisted
-  # @param options Hash that specifies global libkv options and/or
+  # @param backend_options Hash that specifies global libkv options and/or
   #   the specific backend to use (with or without backend-specific
   #   configuration).  Will be merged with `libkv::options`.
   #
@@ -43,11 +43,12 @@ Puppet::Functions.create_function(:'libkv::put') do
   #
   # @raise [LoadError] If the libkv adapter cannot be loaded
   #
-  # @raise [RuntimeError] If the backend operation fails, unless
-  #   `options['softfail']` is `true`.
+  # @raise [RuntimeError] If the backend operation fails, unless 'softfail' is
+  #   `true` in the merged backend options.
   #
   # @return [Boolean] `true` when backend operation succeeds; `false` when the
-  #   backend operation fails and `options['softfail']` is `true`
+  #   backend operation fails and 'softfail' is `true` in the merged backend
+  #   options
   #
   dispatch :put do
     required_param 'String[1]', :key
@@ -79,10 +80,10 @@ Puppet::Functions.create_function(:'libkv::put') do
 
     # use libkv for put operation
     backend_result = catalog.libkv.put(key, value, metadata, merged_options)
-    success = backend_result[:success]
+    success = !result.has_key?(:err_msg)
     unless success
       err_msg =  "libkv::put with key=#{key}: #{backend_result[:err_msg]}"
-      if  merged_options['softfail']
+      if merged_options['softfail']
         Puppet.warning(err_msg)
       else
         raise(err_msg)

@@ -77,20 +77,85 @@ simp_libkv_adapter_class = Class.new do
     return classes.keys
   end
 
-  def delete(params)
-    instance = provider_instance(params)
+  def delete(key, options)
+    normalized_key = normalize_key(key, options)
+    result = nil
+    begin
+      instance = plugin_instance(options)
+      result = instance.delete(normalized_key)
+    rescue Exception => e
+      result = { :err_msg => "#{instance.name} Error: #{e.message}") }
+    end
+
+    result
   end
 
-  def deletetree(params)
-    instance = provider_instance(params)
+  def deletetree(keydir, options)
+    result = nil
+    begin
+      instance = plugin_instance(options)
+      result = instance.deletetree(keydir)
+    rescue Exception => e
+      result = { :err_msg => "#{instance.name} Error: #{e.message}") }
+    end
+
+    result
   end
 
-  def exists(params)
-    instance = provider_instance(params)
+  # execute exists operation on the backend, after normalizing the key
+  # @return Hash result with the presence status (:present) upon
+  #   success or an error message (:err_msg) upon failure
+  def exists(key, options)
+    normalized_key = normalize_key(key, options)
+    result = nil
+    begin
+      instance = plugin_instance(options)
+      result = instance.exists(normalized_key)
+    rescue Exception => e
+      result = { :err_msg => "#{instance.name} Error: #{e.message}") }
+    end
+
+    result
   end
 
-  def get(params)
-    instance = provider_instance(params)
+  # execute get operation on the backend, after normalizing the key
+  # @return Hash result with the value (:value) and any metadata (:metadata) upon
+  #   success or an error message (:err_msg) upon failure
+  def get(key, options)
+    normalized_key = normalize_key(key, options)
+    result = nil
+    begin
+      instance = plugin_instance(options)
+      raw_result = instance.get(normalized_key)
+      if raw_result.has_key?(:value)
+        result = deserialize(raw_result[:value])
+      else
+        result = raw_result
+      end
+    rescue Exception => e
+      result = { :err_msg => "#{instance.name} Error: #{e.message}") }
+    end
+
+    result
+  end
+
+  def list(params)
+    normalized_key = normalize_key(key, options)
+    result = nil
+    begin
+      instance = plugin_instance(options)
+      raw_result = instance.list(normalized_key)
+#FIXME Need to deserialize each value
+      if raw_result.has_key?(:value)
+        result = deserialize(raw_result[:value])
+      else
+        result = raw_result
+      end
+    rescue Exception => e
+      result = { :err_msg => "#{instance.name} Error: #{e.message}") }
+    end
+
+    result
   end
 
   def list(params)
@@ -100,20 +165,17 @@ simp_libkv_adapter_class = Class.new do
   # execute put operation on the backend, after normalizing the key
   # and serializing the value+metadata
   #
-  # @return Hash with status of the operation (:success)
-  #   and error message (:err_msg) in cases of failure
+  # @return Empty Hash upon success and a Hash with an
+  #   error message (:err_msg) in cases of failure
   def put(key, value, metadata, options)
     normalized_key = normalize_key(key, options)
     result = nil
     begin
       normalized_value = serialize(value, metadata)
       instance = plugin_instance(options)
-      result = instance.put(key,normalized_value)
+      result = instance.put(normalized_key, normalized_value)
     rescue Exception => e
-      result = {
-        :success => false,
-        :err_msg => "#{instance.name}: #{e.message}")
-      }
+      result = { :err_msg => "#{instance.name} Error: #{e.message}") }
     end
 
     result
@@ -172,6 +234,8 @@ simp_libkv_adapter_class = Class.new do
     instances[instance_id]
   end
 
+  #FIXME This should use Puppet's serialization code so that
+  # all contained Binary strings in the value object are properly serialized
   def serialize(value, metadata)
     if value.is_a?(String) && (value.encoding == 'ASCII-8BIT')
       encoded_value = Base64.strict_encode64(value)
@@ -188,6 +252,8 @@ simp_libkv_adapter_class = Class.new do
   end
 
 
+  #FIXME This should use Puppet's deserialization code so that
+  # all contained Binary strings in the value object are properly deserialized
   def deserialize(serialized_value)
     encapsulation = JSON.parse(serialized_value)
     unless encapsulation.has_key?('value')
@@ -196,13 +262,13 @@ simp_libkv_adapter_class = Class.new do
 
     result = {}
     if encapsulation['value'].is_a?(String)
-      result['value'] = deserialize_string_value(encapsulation)
+      result[:value] = deserialize_string_value(encapsulation)
     else
-      result['value'] = encapsulation['value']
+      result[:value] = encapsulation['value']
     end
 
     if encapsulation.has_key?('metadata')
-      result['metadata'] =  encapsulation['metadata']
+      result[:metadata] =  encapsulation['metadata']
     end
     result
   end
@@ -222,137 +288,5 @@ simp_libkv_adapter_class = Class.new do
     end
 
     value
-  end
-
-  def method_missing(symbol, url, auth, *args, &block)
-    sanitize_input(symbol, args[0])
-    # For safety make a new hash. This doesn't prevent side effects
-    # but reduces them somewhat
-    params = args[0].dup
-    nargs = [ params ]
-    # ddb hook for testing.
-    # if (params['dd'] == true)
-    #   binding.pry
-    # end
-
-    # Pre-provider mangling
-    unless (params.key?("serialize"))
-      params["serialize"] = true
-    end
-    serialize = params["serialize"]
-    if (params.key?("mode") == false or params["mode"] == "" or params["mode"] == nil)
-      params["mode"] = 'puppet'
-    end
-
-    case symbol
-    when :put
-      if (serialize == true)
-        meta = get_metadata(params, object)
-        params["value"] = pack(meta, params["value"])
-      end
-      retval = object.send(symbol, *nargs, &block);
-    when :atomic_put
-      if (serialize == true)
-        meta = get_metadata(params, object)
-        params["value"] = pack(meta, params["value"])
-      end
-      retval = object.send(symbol, *nargs, &block);
-    else
-      retval = object.send(symbol, *nargs, &block);
-    end
-
-
-    # Post provider mangling
-    case symbol
-    when :delete
-      delete_metadata(params, object)
-      return retval
-    when :get
-      if (serialize == true and params["key"] !~ /.*\.meta$/)
-        metadata = get_metadata(params, object);
-        return unpack(metadata,retval)
-      else
-        return retval
-      end
-    when :atomic_get
-      if (serialize == true and params["key"] !~ /.*\.meta$/)
-        metadata = get_metadata(params, object);
-        if (retval.key?("value"))
-          value = unpack(metadata,retval["value"])
-          retval["value"] = value
-        end
-        return retval
-      else
-        return retval
-      end
-    when :list
-      filtered_list = {}
-      retval.each do |entry, value|
-        unless (entry =~ /.*\.meta$/)
-          if (serialize == true)
-            unless (params['key'] == '/')
-              metadata = get_metadata(params.merge({ "key" => "#{params['key']}/#{entry}" }), object)
-            else
-              metadata = get_metadata(params.merge({ "key" => "/#{entry}" }), object)
-            end
-            filtered_list[entry] = unpack(metadata, value)
-          else
-            filtered_list[entry] = value
-          end
-        end
-      end
-      return filtered_list
-    when :atomic_list
-      filtered_list = {}
-      retval.each do |entry, value|
-        unless (entry =~ /.*\.meta$/)
-          if (serialize == true)
-            unless (params['key'] == '/')
-              metadata = get_metadata(params.merge({ "key" => "#{params['key']}/#{entry}" }), object)
-            else
-              metadata = get_metadata(params.merge({ "key" => "/#{entry}" }), object)
-            end
-            value["value"] = unpack(metadata, value["value"])
-            filtered_list[entry] = value
-          else
-            filtered_list[entry] = value
-          end
-        end
-      end
-      return filtered_list
-    else
-      return retval
-    end
-  end
-
-  def pack(meta, value)
-    unless (meta["type"] == "String")
-      # JSON objects need to be real objects, or else the parser blows up. So wrap in a hash
-      encapsulation = { "value" => value }
-      encapsulation.to_json
-    else
-      value
-    end
-  end
-
-  def unpack(meta, value)
-    retval = value
-    case meta["mode"]
-    when "puppet"
-      unless (meta["type"] == "String")
-        case meta["format"]
-        when "json"
-          unless value == nil
-            object = JSON.parse(value)
-            retval = object["value"]
-          end
-        else
-          raise "Unknown format: #{meta["format"]}"
-        end
-      end
-    else
-      raise "Unknown mode: #{meta["mode"]}"
-    end
-    return retval
   end
 end

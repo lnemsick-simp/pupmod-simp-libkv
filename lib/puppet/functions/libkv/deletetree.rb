@@ -1,110 +1,86 @@
-# Deletes the whole folder named `key`. This action is inherently unsafe.
+# Deletes a whole folder from the configured backend.
 #
 # @author https://github.com/simp/pupmod-simp-libkv/graphs/contributors
 #
 Puppet::Functions.create_function(:'libkv::deletetree') do
 
-  # @param parameters Hash of all parameters
-  #
-  # @return [Boolean] Whether the backend folder deletion operation succeeded
-  #
-  # @raise [RuntimeError] if Ruby files needed for libkv operation
-  # cannot be found
   dispatch :deletetree do
-    param 'Hash', :parameters
+    required_param 'String[1]', :keydir
+    optional_param 'Hash',      :backend_options
   end
 
-  # @param key The folder to delete
+  # @param keydir The key folder to be removed
+  # @param backend_options Hash that specifies global libkv options and/or
+  #   the specific backend to use (with or without backend-specific
+  #   configuration).  Will be merged with `libkv::options`.
   #
-  # @return [Boolean] Whether the backend folder deletion operation succeeded
+  #   Standard options to specify:
   #
+  #   * `softfail`: Boolean.  When set to `true`, this function will return
+  #     a result, even when the operation has failed.  Otherwise, the function
+  #     will fail when the backend operation fails. Defaults to `false`.
+  #   * `environment`: String. When set to a non-empty string, the value is
+  #     prepended to the `key` parameter in this operation.  Should only be set
+  #     to an empty string when the key being accessed is truly global.
+  #     Defaults to the Puppet environment for the node.
+  #   * `backend`: String.  Name of the backend to use.  Must be a key in the
+  #     'backends' sub-Hash of the merged options Hash.  When absent, this
+  #      function will look for a backend whose name matches the calling Class,
+  #      specific Define, or Define type.  If no match is found, it will use
+  #      the 'default' backend.
+  #   * `backends`: Hash.  Hash of backend configuration in which the
+  #     key is the name of an instance of a backend.
   #
-  # @raise [RuntimeError] if Ruby files needed for libkv operation
-  # cannot be found
-  dispatch :deletetree_v1 do
-    param 'String', :key
-  end
-
-  def deletetree_v1(key)
-    params = {}
-    params['key'] = key
-
-    deletetree(params)
-  end
-
-  def deletetree(params)
-    # ensure all required parameters are present
-    validate_params(params)
-
-    # add defaults for optional parameters
-    nparams = update_params(params)
+  #     * Merged hash must have backend configuration for a 'default' key.
+  #     * Each backend configuration must be a Hash with the following
+  #       required keys:
+  #
+  #       * `id`:  Unique name for the instance of the backend. (Same backend
+  #         type can be configured differently).
+  #       * `type`:  Backend type.  Returned value of `<plugin class>.name()`.
+  #
+  # @raise [ArgumentError] If the key is invalid, the requested backend does
+  #   not exist in `libkv::options`, or the plugin for the requested backend
+  #   is not available.
+  #
+  # @raise [LoadError] If the libkv adapter cannot be loaded
+  #
+  # @raise [RuntimeError] If the backend operation fails, unless 'softfail' is
+  #   `true` in the merged backend options.
+  #
+  # @return [Boolean] `true` when backend operation succeeds; `false` when the
+  #   backend operation fails and 'softfail' is `true` in the merged backend
+  #   options
+  #
+  def deletetree(keydir, backend_options={})
+    # key validation difficult to do via a type alias, so validate via function
+    call_function('libkv::validate_key', key)
 
     # add libkv 'extension' to the catalog instance as needed
-    catalog = closure_scope.find_global_scope.catalog
-    unless catalog.respond_to?(:libkv)
-      lib_dir = File.dirname(File.dirname(File.dirname(File.dirname("#{__FILE__}"))))
-      filename = File.join(lib_dir, 'puppet_x', 'libkv', 'loader.rb')
-      if File.exists?(filename)
-        catalog.instance_eval(File.read(filename), filename)
-      else
-        raise("Internal error: libkv::deletetree unable to load #{filename}: File not found")
-      end
-    end
+    call_function('libkv::add_libkv')
 
-    # use libkv for deletetree operation
-    retval = nil
+    # determine backend configuration using backend_options, `libkv::options`,
+    # and the list of backends for which plugins have been loaded
     begin
-      retval = catalog.libkv.deletetree(nparams['url'], nparams['auth'], nparams);
-    rescue Exception => e
-      if nparams['softfail']
-        retval = []
+      merged_options = call_function( 'libkv::get_backend_config',
+        backend_options, catalog.libkv.backends)
+    rescue RuntimeError => e
+      msg = "libkv Configuration Error for libkv::deletetree with key=#{key}: #{e.message}"
+      raise ArgumentError.new(msg)
+    end
+
+    # use libkv for delete operation
+    backend_result = catalog.libkv.deletetree(key, merged_options)
+    success = !result.has_key?(:err_msg)
+    unless success
+      err_msg =  "libkv::deletetree with key=#{key}: #{backend_result[:err_msg]}"
+      if merged_options['softfail']
+        Puppet.warning(err_msg)
       else
-        raise(e)
+        raise(err_msg)
       end
     end
 
-    return retval;
-  end
-
-  # Add defaults for missing, optional parameters and Puppet info
-  # @param input parameters (read-only)
-  # @return copy of params that has been updated
-  def update_params(params)
-    nparams = params.dup
-
-    # determine url and auth parameters to use
-    unless nparams.key?('url')
-      nparams['url'] = call_function('lookup', 'libkv::url', { 'default_value' => 'mock://' })
-    end
-
-    unless nparams.key?('auth')
-      nparams['auth'] = call_function('lookup', 'libkv::auth', { 'default_value' => nil })
-    end
-
-    # add Puppet info to params
-    unless nparams.key?('environment')
-      nparams['environment'] = closure_scope.lookupvar('::environment')
-    end
-
-    unless nparams.key?('user')
-      nparams['user'] = Puppet.settings[:user] ? Puppet.settings[:user] : 'puppet'
-    end
-
-    unless nparams.key?('group')
-      nparams['group'] = Puppet.settings[:group] ? Puppet.settings[:group] : 'group'
-    end
-
-    unless nparams.key?('puppet_vardir')
-      nparams['group'] = Puppet.settings[:vardir] ? Puppet.settings[:vardir] : 'vardir'
-    end
-
-    nparams
-  end
-
-
-  # check for required parameters
-  # @param input parameters
-  # @raise ArgumentError if any required parameters are missing
-  def validate_params(params)
+    success
   end
 end
