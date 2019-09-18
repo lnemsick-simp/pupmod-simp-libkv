@@ -221,8 +221,8 @@ plugin_class = Class.new do
       Dir.glob(File.join(dir,'*')).each do |keyfile|
         key = keyfile.gsub(@root_path + File::SEPARATOR,'')
         result = get(key)
-        unless result[:value].nil?
-          pairs[key] = result[:value]
+        unless result[:result].nil?
+          pairs[key] = result[:result]
         end
       end
     else

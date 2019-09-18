@@ -368,6 +368,7 @@ describe 'libkv file plugin anonymous class' do
       end
     end
 
+    # using plugin's put() in this test, because it is fully tested below
     describe 'list' do
 
       it 'should return an empty :result when key folder is empty' do
@@ -379,12 +380,42 @@ describe 'libkv file plugin anonymous class' do
       end
 
       it 'should return full list of key/value pairs in :result when key folder content is accessible' do
+        expected = {
+          'production/key1' => 'value for key1',
+          'production/key2' => 'value for key2',
+          'production/key3' => 'value for key3'
+        }
+        expected.each { |key,value| @plugin.put(key, value) }
+        result = @plugin.list('production')
+        expect( result[:result] ).to eq(expected)
+        expect( result[:err_msg] ).to be_nil
       end
 
       it 'should return partial list of key/value pairs in :result when some key folder content is not accessible' do
+        expected = {
+          'production/key1' => 'value for key1',
+          'production/key3' => 'value for key3'
+        }
+        expected.each { |key,value| @plugin.put(key, value) }
+
+        # create a file for 'production/key2', but make it inaccessible via a lock
+        locked_key_file_operation(@root_path, 'production/key2', 'value for key2') do
+          puts "     >> Executing plugin list() for 'production'"
+          result = @plugin.list('production')
+          expect( result[:result] ).to eq(expected)
+          expect( result[:err_msg] ).to be_nil
+        end
+
       end
 
       it 'should return an unset :result and an :err_msg when key folder exists but is not accessible' do
+        # create inaccessible key folder that has content
+        @plugin.put('production/gen_passwd/key1', 'value for key1')
+        FileUtils.chmod(0400, File.join(@root_path, 'production'))
+        result = @plugin.list('production/gen_passwd')
+        FileUtils.chmod(0770, File.join(@root_path, 'production'))
+        expect( result[:result] ).to be_nil
+        expect( result[:err_msg] ).to match(/Key folder not found/)
       end
 
       it 'should return an unset :result  and an :err_msg when key folder does not exist' do
