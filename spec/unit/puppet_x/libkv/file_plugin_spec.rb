@@ -194,7 +194,7 @@ describe 'libkv file plugin anonymous class' do
 
     describe 'delete' do
       it 'should return empty Hash (success) when the key file does not exist' do
-        expect( @plugin.delete('does/not/exist') ).to eq({})
+        expect( @plugin.delete('does/not/exist/key') ).to eq({})
       end
 
       it 'should return empty Hash (success) when the key file can be deleted' do
@@ -205,10 +205,12 @@ describe 'libkv file plugin anonymous class' do
       end
 
       it 'should return Hash with :err_msg key (failure) when the key file delete fails' do
-        key_file = File.join(@root_path, 'key1')
+        # make a key file that is inaccessible
+        key_file = File.join(@root_path, 'production/key1')
+        FileUtils.mkdir_p(File.dirname(key_file))
         FileUtils.touch(key_file)
         FileUtils.chmod(0400, File.dirname(key_file))
-        result = @plugin.delete('key1')
+        result = @plugin.delete('production/key1')
         expect( result[:err_msg] ).to match(/Delete failed:/)
         FileUtils.chmod(0770, File.dirname(key_file))
         expect( File.exist?(key_file) ).to be true
@@ -216,9 +218,53 @@ describe 'libkv file plugin anonymous class' do
     end
 
     describe 'deletetree' do
+      it 'should return empty Hash (success) when the key folder does not exist' do
+        expect( @plugin.delete('does/not/exist/folder') ).to eq({})
+      end
+
+      it 'should return empty Hash (success) when the key folder can be deleted' do
+        key_dir = File.join(@root_path, 'production')
+        FileUtils.mkdir_p(key_dir)
+        FileUtils.touch(File.join(key_dir, 'key1'))
+        FileUtils.touch(File.join(key_dir, 'key2'))
+        expect( @plugin.deletetree('production') ).to eq({})
+        expect( Dir.exist?(key_dir) ).to be false
+      end
+
+      it 'should return Hash with :err_msg key (failure) when the key folder delete fails' do
+        # make a key file that is inaccessible so that recursive delete fails
+        key_dir = File.join(@root_path, 'production/gen_passwd')
+        FileUtils.mkdir_p(key_dir)
+        key_file = File.join(key_dir, 'key1')
+        FileUtils.touch(key_file)
+        FileUtils.chmod(0400, File.dirname(key_file))
+        result = @plugin.deletetree('production/gen_passwd')
+        expect( result[:err_msg] ).to match(/Folder delete failed:/)
+        FileUtils.chmod(0770, File.dirname(key_file))
+        expect( Dir.exist?(key_dir) ).to be true
+      end
     end
 
     describe 'exists' do
+      it 'should return Hash with :present = false when the key file does not exist' do
+        expect( @plugin.exists('does/not/exist/key') ).to eq({ :present => false })
+      end
+
+      it 'should return Hash with :present = true when the key file exists and is accessible' do
+        key_file = File.join(@root_path, 'key1')
+        FileUtils.touch(key_file)
+        expect( @plugin.exists('key1') ).to eq({ :present => true })
+      end
+
+      it 'should return Hash with :present = false when the key file exists but is not accessible' do
+        # make a key file that is inaccessible
+        key_file = File.join(@root_path, 'production/key1')
+        FileUtils.mkdir_p(File.dirname(key_file))
+        FileUtils.touch(key_file)
+        FileUtils.chmod(0400, File.dirname(key_file))
+        expect( @plugin.exists('production/key1') ).to eq({ :present => false })
+        FileUtils.chmod(0770, File.dirname(key_file))
+      end
     end
 
     describe 'get' do

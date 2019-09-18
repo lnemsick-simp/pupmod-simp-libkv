@@ -120,6 +120,7 @@ plugin_class = Class.new do
     if Dir.exist?(dir)
       begin
         FileUtils.rm_r(dir)
+        result = {}
       rescue Exception => e
         if Dir.exist?(dir)
           result = { :err_msg => "Folder delete failed: #{e.message}" }
@@ -143,6 +144,7 @@ plugin_class = Class.new do
   #   or an error message (:err_msg) upon failure
   def exists(key)
     key_file = File.join(@root_path, key)
+    # this simple plugin doesn't have any error cases to report with :err_msg
     { :present => File.exist?(key_file) }
   end
 
