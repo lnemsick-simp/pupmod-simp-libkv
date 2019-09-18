@@ -34,7 +34,7 @@ simp_libkv_adapter_class = Class.new do
     # - Each plugin file must contain an anonymous class that can be accessed
     #   by a 'plugin_class' local variable.
     # - Each plugin must provide the following methods, which are described
-    #   in detail in plugin_api.rb:
+    #   in detail in plugin_template.rb:
     #   - Class methods:
     #     - type: Class method that returns the backend type
     #   - Instance methods:
