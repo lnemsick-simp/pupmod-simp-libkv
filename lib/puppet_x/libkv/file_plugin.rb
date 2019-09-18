@@ -14,7 +14,7 @@ plugin_class = Class.new do
 
   ###### Public Plugin API ######
 
-  # @return backend type
+  # @return String. backend type
   def self.type
     'file'
   end
@@ -89,70 +89,95 @@ plugin_class = Class.new do
 
   # Deletes a `key` from the configured backend.
   #
-  # @return Empty Hash upon success and a Hash with an error message (:err_msg)
-  #   upon failure
+  # @param key String key
+  #
+  # @return results Hash
+  #   * :result - Boolean indicating whether operation succeeded
+  #   * :err_msg - String. Explanatory text upon failure; nil otherwise.
+  #
   def delete(key)
-    result = nil
+    success = nil
+    err_msg = nil
     key_file = File.join(@root_path, key)
     begin
       File.unlink(key_file)
-      result = {}
+      success = true
     rescue Errno::ENOENT
       # if the key doesn't exist, doesn't need to be deleted...going
       # to consider this success
-      result = {}
+      success = true
     rescue Exception => e
-      result = { :err_msg => "Delete failed: #{e.message}" }
+      success = false
+      err_msg = "Delete failed: #{e.message}"
     end
 
-    result
+    { :result => success, :err_msg => err_msg }
   end
 
   # Deletes a whole folder from the configured backend.
   #
-  # @return Empty Hash upon success and a Hash with an error message (:err_msg)
-  #   upon failure
+  # @param keydir String key folder path
+  #
+  # @return results Hash
+  #   * :result - Boolean indicating whether operation succeeded
+  #   * :err_msg - String. Explanatory text upon failure; nil otherwise.
+  #
   def deletetree(keydir)
-    result = nil
+    success = nil
+    err_msg = nil
     dir = File.join(@root_path, keydir)
     # FIXME:  Is there an atomic way of doing this?
     if Dir.exist?(dir)
       begin
         FileUtils.rm_r(dir)
-        result = {}
+        success = true
       rescue Exception => e
         if Dir.exist?(dir)
-          result = { :err_msg => "Folder delete failed: #{e.message}" }
+          success = false
+          err_msg = "Folder delete failed: #{e.message}"
         else
           # in case another process/thread successfully deleted the directory
-          result = {}
+          success = true
         end
       end
     else
       # if the directory doesn't exist, doesn't need to be deleted...going
       # to consider this success
-      result = {}
+      success = true
     end
 
-    result
+    { :result => success, :err_msg => err_msg }
   end
 
   # Returns whether the `key` exists in the configured backend.
   #
-  # @return Hash result with the key presence status (:present) upon success
-  #   or an error message (:err_msg) upon failure
+  # @param key String key
+  #
+  # @return results Hash
+  #   * :result - Boolean indicating whether key exists; nil if could not
+  #     be determined
+  #   * :err_msg - String. Explanatory text when status could not be
+  #     determined; nil otherwise.
+  #
   def exists(key)
     key_file = File.join(@root_path, key)
-    # this simple plugin doesn't have any error cases to report with :err_msg
-    { :present => File.exist?(key_file) }
+    # this simple plugin doesn't have any error cases that would be reported
+    # in :err_msg
+    { :result => File.exist?(key_file), :err_msg => nil }
   end
 
   # Retrieves the value stored at `key` from the configured backend.
   #
-  # @return Hash result with the value (:value) upon success or an error message
-  # (:err_msg) upon failure
+  # @param key String key
+  #
+  # @return results Hash
+  #   * :result - String. Retrieved value for the key; nil if could not
+  #     be retrieved
+  #   * :err_msg - String. Explanatory text upon failure; nil otherwise.
+  #
   def get(key)
-    result = nil
+    value = nil
+    err_msg = nil
     key_file = File.join(@root_path, key)
     begin
       Timeout::timeout(@lock_timeout_seconds) do
@@ -160,25 +185,29 @@ plugin_class = Class.new do
         # do **NOT** use a File.open block!
         file = File.open(key_file, 'r')
         file.flock(File::LOCK_EX)
-        result = { :value => file.read }
-        file.flock(File::LOCK_UN)
-        file.close
+        value = file.read
+        file.close # lock released with close
       end
+
     # Don't need to specify the key in the error messages below, as the key
     # will be appended to the message by the originating libkv::get()
     rescue Errno::ENOENT
-      result = { :err_msg => "libkv plugin #{@name}: Key not found"  }
+      err_msg = "libkv plugin #{@name}: Key not found"
     rescue Timeout::Error
-      result = { :err_msg => "libkv plugin #{@name}: Timed out waiting for key file lock"  }
+      err_msg = "libkv plugin #{@name}: Timed out waiting for key file lock"
     rescue Exception => e
-      result = { :err_msg => "Key retrieval failed: #{e.message}" }
+      err_msg = "Key retrieval failed: #{e.message}"
     end
+    { :result => value, :err_msg => err_msg }
   end
 
-  # Returns a list of all keys in a folder.
+  # Returns a list of all keys/value pairs in a folder
   #
-  # @return FIXME Hash result with the value (:value) upon success or an error message
-  # (:err_msg) upon failure
+  # @return results Hash
+  #   * :result - Hash of retrieved key/value pairs; nil if could not
+  #     be retrieved
+  #   * :err_msg - String. Explanatory text upon failure; nil otherwise.
+  #
   def list(keydir)
     result = nil
     if Dir.exist?(File.join(@root_path, keydir))
@@ -204,15 +233,18 @@ plugin_class = Class.new do
     key_file = File.join(@root_path, key)
     begin
       Timeout::timeout(@lock_timeout_seconds) do
-        # Don't use 'w' as it truncates file before the lock is obtained
-        File.open("counter", File::RDWR|File::CREAT, 0640) do |file|
-          file.flock(File::LOCK_EX)
-          file.rewind
-          file.write(value)
-          file.flush
-          file.truncate(file.pos)
-        end
+        # To ensure all threads are not sharing the same file descriptor
+        # do **NOT** use a File.open block!
+        # Also, don't use 'w' as it truncates file before the lock is obtained
+        file = File.open(key_file, File::RDWR|File::CREAT, 0640)
+        file.flock(File::LOCK_EX)
+        file.rewind
+        file.write(value)
+        file.flush
+        file.truncate(file.pos)
+        file.close # lock released with close
       end
+
     # Don't need to specify the key in the error messages below, as the key
     # will be appended to the message by the originating libkv::get()
     rescue Timeout::Error

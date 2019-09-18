@@ -194,24 +194,27 @@ describe 'libkv file plugin anonymous class' do
     end
 
     describe 'delete' do
-      it 'should return empty Hash (success) when the key file does not exist' do
-        expect( @plugin.delete('does/not/exist/key') ).to eq({})
+      it 'should return :result=true when the key file does not exist' do
+        expect( @plugin.delete('does/not/exist/key')[:result] ).to be true
+        expect( @plugin.delete('does/not/exist/key')[:err_msg] ).to be_nil
       end
 
-      it 'should return empty Hash (success) when the key file can be deleted' do
+      it 'should return :result=true when the key file can be deleted' do
         key_file = File.join(@root_path, 'key1')
         FileUtils.touch(key_file)
-        expect( @plugin.delete('key1') ).to eq({})
+        expect( @plugin.delete('key1')[:result] ).to be true
+        expect( @plugin.delete('key1')[:err_msg] ).to be_nil
         expect( File.exist?(key_file) ).to be false
       end
 
-      it 'should return Hash with :err_msg (failure) when the key file delete fails' do
+      it 'should return :result=false and an :err_msg when the key file delete fails' do
         # make a key file that is inaccessible
         key_file = File.join(@root_path, 'production/key1')
         FileUtils.mkdir_p(File.dirname(key_file))
         FileUtils.touch(key_file)
         FileUtils.chmod(0400, File.dirname(key_file))
         result = @plugin.delete('production/key1')
+        expect( result[:result] ).to be false
         expect( result[:err_msg] ).to match(/Delete failed:/)
         FileUtils.chmod(0770, File.dirname(key_file))
         expect( File.exist?(key_file) ).to be true
@@ -219,20 +222,22 @@ describe 'libkv file plugin anonymous class' do
     end
 
     describe 'deletetree' do
-      it 'should return empty Hash (success) when the key folder does not exist' do
-        expect( @plugin.delete('does/not/exist/folder') ).to eq({})
+      it 'should return :result=true when the key folder does not exist' do
+        expect( @plugin.deletetree('does/not/exist/folder')[:result] ).to be true
+        expect( @plugin.deletetree('does/not/exist/folder')[:err_msg] ).to be_nil
       end
 
-      it 'should return empty Hash (success) when the key folder can be deleted' do
+      it 'should return :result=true when the key folder can be deleted' do
         key_dir = File.join(@root_path, 'production')
         FileUtils.mkdir_p(key_dir)
         FileUtils.touch(File.join(key_dir, 'key1'))
         FileUtils.touch(File.join(key_dir, 'key2'))
-        expect( @plugin.deletetree('production') ).to eq({})
+        expect( @plugin.deletetree('production')[:result] ).to be true
+        expect( @plugin.deletetree('production')[:err_msg] ).to be_nil
         expect( Dir.exist?(key_dir) ).to be false
       end
 
-      it 'should return Hash with :err_msg (failure) when the key folder delete fails' do
+      it 'should return :result=false and an :err_msg when the key folder delete fails' do
         # make a key file that is inaccessible so that recursive delete fails
         key_dir = File.join(@root_path, 'production/gen_passwd')
         FileUtils.mkdir_p(key_dir)
@@ -240,6 +245,7 @@ describe 'libkv file plugin anonymous class' do
         FileUtils.touch(key_file)
         FileUtils.chmod(0400, File.dirname(key_file))
         result = @plugin.deletetree('production/gen_passwd')
+        expect( result[:result] ).to be false
         expect( result[:err_msg] ).to match(/Folder delete failed:/)
         FileUtils.chmod(0770, File.dirname(key_file))
         expect( Dir.exist?(key_dir) ).to be true
@@ -247,43 +253,50 @@ describe 'libkv file plugin anonymous class' do
     end
 
     describe 'exists' do
-      it 'should return Hash with :present = false when the key file does not exist' do
-        expect( @plugin.exists('does/not/exist/key') ).to eq({ :present => false })
+      it 'should return :result=false when the key file does not exist' do
+        result = @plugin.exists('does/not/exist/key')
+        expect( result[:result] ).to be false
+        expect( result[:err_msg] ).to be_nil
       end
 
-      it 'should return Hash with :present = true when the key file exists and is accessible' do
+      it 'should return :result=true when the key file exists and is accessible' do
         key_file = File.join(@root_path, 'key1')
         FileUtils.touch(key_file)
-        expect( @plugin.exists('key1') ).to eq({ :present => true })
+        result = @plugin.exists('key1')
+        expect( result[:result] ).to be true
+        expect( result[:err_msg] ).to be_nil
       end
 
-      it 'should return Hash with :present = false when the key file exists but is not accessible' do
+      it 'should return :result=false when the key file exists but is not accessible' do
         # make a key file that is inaccessible
         key_file = File.join(@root_path, 'production/key1')
         FileUtils.mkdir_p(File.dirname(key_file))
         FileUtils.touch(key_file)
         FileUtils.chmod(0400, File.dirname(key_file))
-        expect( @plugin.exists('production/key1') ).to eq({ :present => false })
+        result = @plugin.exists('production/key1')
+        expect( result[:result] ).to be false
+        expect( result[:err_msg] ).to be_nil
         FileUtils.chmod(0770, File.dirname(key_file))
       end
     end
 
     describe 'get' do
-      it 'should return Hash with :value when the key file exists and is accessible' do
+      it 'should return set :result when the key file exists and is accessible' do
         key_file = File.join(@root_path, 'key1')
         value = 'value for key1'
         File.open(key_file, 'w') { |file| file.write(value) }
         result = @plugin.get('key1')
-        expect( result[:value] ).to eq value
-        expect( result.has_key?(:err_msg) ).to be false
+        expect( result[:result] ).to eq value
+        expect( result[:err_msg] ).to be_nil
       end
 
-      it 'should return Hash with :err_msg when the key file does not exist' do
+      it 'should return an unset :result and an :err_msg when the key file does not exist' do
         result = @plugin.get('does/not/exist/key')
+        expect( result[:result] ).to be_nil
         expect( result[:err_msg] ).to match(/Key not found/)
       end
 
-      it 'should return Hash with :err_msg when times out waiting for key lock' do
+      it 'should return an unset :result and an :err_msg when times out waiting for key lock' do
         key_file = File.join(@root_path, 'key1')
         value = 'value for key1'
         File.open(key_file, 'w') { |file| file.write(value) }
@@ -299,14 +312,14 @@ describe 'libkv file plugin anonymous class' do
              locked = true
              # pause the thread
              Thread.stop
-             file.flock(File::LOCK_UN)
-             puts '     >> Lock released'
+             file.close
+             puts '     >> Lock released with close'
           end
 
           sleep 0.5 while !locked
           puts "     >> Executing get for key file #{key_file}"
           result = @plugin.get('key1')
-          expect( result.has_key?(:value) ).to be false
+          expect( result[:result] ).to be_nil
           expect( result[:err_msg] ).to match /Timed out waiting for key file lock/
         ensure
           if locker_thread
@@ -318,15 +331,21 @@ describe 'libkv file plugin anonymous class' do
             locker_thread.join
           end
         end
+
+        # just to be sure lock is appropriately cleared...
+        result = @plugin.get('key1')
+        expect( result[:result] ).to_not be_nil
+        expect( result[:err_msg] ).to be_nil
       end
 
-      it 'should return Hash with :err_msg when the key file exists but is not accessible' do
+      it 'should return an unset :result and an :err_msg when the key file exists but is not accessible' do
         # make a key file that is inaccessible
         key_file = File.join(@root_path, 'production/key1')
         FileUtils.mkdir_p(File.dirname(key_file))
         File.open(key_file, 'w') { |file| file.write('value for key1') }
         FileUtils.chmod(0400, File.dirname(key_file))
         result = @plugin.get('production/key1')
+        expect( result[:result] ).to be_nil
         expect( result[:err_msg] ).to match(/Key retrieval failed/)
         FileUtils.chmod(0770, File.dirname(key_file))
       end
@@ -336,6 +355,9 @@ describe 'libkv file plugin anonymous class' do
     end
 
     describe 'name' do
+      it 'should return configured name' do
+        expect( @plugin.name ).to eq 'file/test'
+      end
     end
 
     describe 'put' do
