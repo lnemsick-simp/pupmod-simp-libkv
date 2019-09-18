@@ -2,14 +2,13 @@
 # on a local filesystem
 #
 # Each plugin **MUST** be an anonymous class accessible only through
-# a `plugin_class` local variable, which **MUST** be defined the
-# loading classes scope
+# a `plugin_class` local variable.
 plugin_class = Class.new do
 
   require 'fileutils'
   require 'timeout'
 
-  # Reminder:  Do NOT try to set constants in this Class.new block.
+  # Reminder:  Do **NOT** try to set constants in this Class.new block.
   #            They don't do what you expect (are not accessible within
   #            any class methods) and pollute the Object namespace.
 
@@ -60,7 +59,7 @@ plugin_class = Class.new do
     if options['backends'][backend].has_key?('root_path')
       @root_path = options['backends'][backend]['root_path']
     else
-      @root_path = '/var/simp/libkv/file'
+      @root_path = File.join('/', 'var', 'simp', 'libkv', name)
     end
 
     if options['backends'][backend].has_key?('lock_timeout_seconds')
@@ -157,10 +156,13 @@ plugin_class = Class.new do
     key_file = File.join(@root_path, key)
     begin
       Timeout::timeout(@lock_timeout_seconds) do
-        File.open(key_file, 'r') do |file|
-          file.flock(File::LOCK_EX)
-          value = file.read
-        end
+        # To ensure all threads are not sharing the same file descriptor
+        # do **NOT** use a File.open block!
+        file = File.open(key_file, 'r')
+        file.flock(File::LOCK_EX)
+        result = { :value => file.read }
+        file.flock(File::LOCK_UN)
+        file.close
       end
     # Don't need to specify the key in the error messages below, as the key
     # will be appended to the message by the originating libkv::get()

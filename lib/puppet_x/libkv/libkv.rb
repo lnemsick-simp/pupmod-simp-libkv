@@ -24,7 +24,7 @@ simp_libkv_adapter_class = Class.new do
     @plugin_classes   = {} # backend plugin classes;
                            # key = backend type returned by <plugin Class>.type
     @plugin_instances = {} # backend plugin instances;
-                           # key = name assigned to the instance, <type:id>
+                           # key = name assigned to the instance, <type>/<id>
                            # supports multiple backend plugin instances per backend
 
     # Load in the libkv backend plugins from all modules.
@@ -258,7 +258,7 @@ simp_libkv_adapter_class = Class.new do
   #   to one and only one backend plugin, i.e., the backend plugin class whose
   #   type method returns this value
   #
-  # The new object will be uniquely identified by a <type:id> key.
+  # The new object will be uniquely identified by a <type>/<id> key.
   #
   # @return an instance of a backend plugin class specified by options
   # @raise if any required backend configuration is missing or the backend
@@ -283,7 +283,7 @@ simp_libkv_adapter_class = Class.new do
     id = backend_config['id']
     type = backend_config['type']
 
-    name = "#{type}:#{id}"
+    name = "#{type}/#{id}"
     unless plugin_instances.has_key?(name)
       begin
         plugin_instances[name] = plugin_classes[backend].new(name, backend_config)
