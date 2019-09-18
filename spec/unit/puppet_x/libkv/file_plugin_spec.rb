@@ -10,6 +10,49 @@ plugin_class = nil
 obj = Object.new
 obj.instance_eval(File.read(plugin_file), plugin_file)
 
+def locked_key_file_operation(root_path, key, value, &block)
+  # create the file to be locked
+  key_file = File.join(root_path, key)
+  File.open(key_file, 'w') { |file| file.write(value) }
+
+  locker_thread = nil   # thread that will lock the file
+  mutex = Mutex.new
+  locked = ConditionVariable.new
+  begin
+    locker_thread = Thread.new do
+      puts "     >> Locking key file #{key_file}"
+      file = File.open(key_file, 'r')
+      file.flock(File::LOCK_EX)
+
+      # signal the lock has taken place
+      mutex.synchronize { locked.signal }
+
+      # pause the thread until we are done our access attempt
+      Thread.stop
+      file.close
+      puts '     >> Lock released with close'
+    end
+
+
+    # wait for the thread to signal the lock has taken place
+    mutex.synchronize { locked.wait(mutex) }
+
+    # exercise the accessor
+    block.call
+
+  ensure
+    if locker_thread
+      # wait until thread has paused
+      sleep 0.5 while locker_thread.status != 'sleep'
+
+      # resume and then wait until thread completed
+      locker_thread.run
+      locker_thread.join
+    end
+  end
+
+end
+
 describe 'libkv file plugin anonymous class' do
   context 'type' do
     it "class.type should return 'file'" do
@@ -297,43 +340,17 @@ describe 'libkv file plugin anonymous class' do
       end
 
       it 'should return an unset :result and an :err_msg when times out waiting for key lock' do
-        key_file = File.join(@root_path, 'key1')
+        key = 'key1'
         value = 'value for key1'
-        File.open(key_file, 'w') { |file| file.write(value) }
-
-        locker_thread = nil
-        get_thread = nil
-        locked = false
-        begin
-          locker_thread = Thread.new do
-             puts "     >> Locking key file #{key_file}"
-             file = File.open(key_file, 'r')
-             file.flock(File::LOCK_EX)
-             locked = true
-             # pause the thread
-             Thread.stop
-             file.close
-             puts '     >> Lock released with close'
-          end
-
-          sleep 0.5 while !locked
-          puts "     >> Executing get for key file #{key_file}"
-          result = @plugin.get('key1')
+        locked_key_file_operation(@root_path, key, value) do
+          puts "     >> Executing plugin get() for '#{key}'"
+          result = @plugin.get(key)
           expect( result[:result] ).to be_nil
           expect( result[:err_msg] ).to match /Timed out waiting for key file lock/
-        ensure
-          if locker_thread
-            # wait until thread paused
-            sleep 0.5 while locker_thread.status != 'sleep'
-
-            # resume and then wait until thread completed
-            locker_thread.run
-            locker_thread.join
-          end
         end
 
         # just to be sure lock is appropriately cleared...
-        result = @plugin.get('key1')
+        result = @plugin.get(key)
         expect( result[:result] ).to_not be_nil
         expect( result[:err_msg] ).to be_nil
       end
@@ -352,6 +369,29 @@ describe 'libkv file plugin anonymous class' do
     end
 
     describe 'list' do
+
+      it 'should return an empty :result when key folder is empty' do
+        key_dir = File.join(@root_path, 'production')
+        FileUtils.mkdir_p(key_dir)
+        result = @plugin.list('production')
+        expect( result[:result] ).to eq({})
+        expect( result[:err_msg] ).to be_nil
+      end
+
+      it 'should return full list of key/value pairs in :result when key folder content is accessible' do
+      end
+
+      it 'should return partial list of key/value pairs in :result when some key folder content is not accessible' do
+      end
+
+      it 'should return an unset :result and an :err_msg when key folder exists but is not accessible' do
+      end
+
+      it 'should return an unset :result  and an :err_msg when key folder does not exist' do
+        result = @plugin.list('production')
+        expect( result[:result] ).to be_nil
+        expect( result[:err_msg] ).to match(/Key folder not found/)
+      end
     end
 
     describe 'name' do
@@ -403,38 +443,12 @@ describe 'libkv file plugin anonymous class' do
         key = 'key1'
         value1 = 'first value for key1'
         value2 = 'second value for key1'
-        key_file = File.join(@root_path, key)
-        File.open(key_file, 'w') { |file| file.write(value1) }
 
-        locker_thread = nil
-        get_thread = nil
-        locked = false
-        begin
-          locker_thread = Thread.new do
-             puts "     >> Locking key file #{key_file}"
-             file = File.open(key_file, 'r')
-             file.flock(File::LOCK_EX)
-             locked = true
-             # pause the thread
-             Thread.stop
-             file.close
-             puts '     >> Lock released with close'
-          end
-
-          sleep 0.5 while !locked
-          puts "     >> Executing put for key file #{key_file}"
+        locked_key_file_operation(@root_path, key, value1) do
+          puts "     >> Executing plugin.put() for '#{key}'"
           result = @plugin.put(key, value2)
           expect( result[:result] ).to be false
           expect( result[:err_msg] ).to match /Timed out waiting for key file lock/
-        ensure
-          if locker_thread
-            # wait until thread paused
-            sleep 0.5 while locker_thread.status != 'sleep'
-
-            # resume and then wait until thread completed
-            locker_thread.run
-            locker_thread.join
-          end
         end
 
         # just to be sure lock is appropriately cleared...
