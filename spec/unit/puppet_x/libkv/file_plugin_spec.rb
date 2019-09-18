@@ -360,9 +360,105 @@ describe 'libkv file plugin anonymous class' do
       end
     end
 
+    # using plugin's get() in this test, because it has already been
+    # fully tested
     describe 'put' do
-    end
+      it 'should return :result=true when the key file does not exist for a simple key' do
+        key = 'key1'
+        value = 'value for key1'
+        result = @plugin.put(key, value)
+        expect( result[:result] ).to be true
+        expect( result[:err_msg] ).to be_nil
+        expect( @plugin.get(key)[:result] ).to eq value
+      end
 
+      it 'should return :result=true when the key file does not exist for a complex key' do
+        key = 'production/gen_passwd/key1'
+        value = 'value for key1'
+        result = @plugin.put(key, value)
+        expect( result[:result] ).to be true
+        expect( result[:err_msg] ).to be_nil
+        expect( @plugin.get(key)[:result] ).to eq value
+      end
+
+      it 'should return :result=true when the key file exists and is accessible' do
+        key = 'key1'
+        value1 = 'value for key1 which is longer than second value'
+        value2 = 'second value for key1'
+        value3 = 'third value for key1 which is longer than second value'
+        @plugin.put(key, value1)
+
+        result = @plugin.put(key, value2)
+        expect( result[:result] ).to be true
+        expect( result[:err_msg] ).to be_nil
+        expect( @plugin.get(key)[:result] ).to eq value2
+
+        result = @plugin.put(key, value3)
+        expect( result[:result] ).to be true
+        expect( result[:err_msg] ).to be_nil
+        expect( @plugin.get(key)[:result] ).to eq value3
+      end
+
+      it 'should return :result=false and an :err_msg when times out waiting for key lock' do
+        key = 'key1'
+        value1 = 'first value for key1'
+        value2 = 'second value for key1'
+        key_file = File.join(@root_path, key)
+        File.open(key_file, 'w') { |file| file.write(value1) }
+
+        locker_thread = nil
+        get_thread = nil
+        locked = false
+        begin
+          locker_thread = Thread.new do
+             puts "     >> Locking key file #{key_file}"
+             file = File.open(key_file, 'r')
+             file.flock(File::LOCK_EX)
+             locked = true
+             # pause the thread
+             Thread.stop
+             file.close
+             puts '     >> Lock released with close'
+          end
+
+          sleep 0.5 while !locked
+          puts "     >> Executing put for key file #{key_file}"
+          result = @plugin.put(key, value2)
+          expect( result[:result] ).to be false
+          expect( result[:err_msg] ).to match /Timed out waiting for key file lock/
+        ensure
+          if locker_thread
+            # wait until thread paused
+            sleep 0.5 while locker_thread.status != 'sleep'
+
+            # resume and then wait until thread completed
+            locker_thread.run
+            locker_thread.join
+          end
+        end
+
+        # just to be sure lock is appropriately cleared...
+        result = @plugin.put(key, value2)
+        expect( result[:result] ).to be true
+        expect( result[:err_msg] ).to be_nil
+      end
+
+      it 'should return :result=false an an :err_msg when the key file exists but is not accessible' do
+        # make a key file that is inaccessible
+        key = 'production/gen_passwd/key1'
+        value1 = 'first value for key1'
+        value2 = 'second value for key1'
+        @plugin.put(key, value1)
+        key_parent_dir = File.join(@root_path, 'production', 'gen_passwd')
+        FileUtils.chmod(0400, key_parent_dir)
+
+        result = @plugin.put(key, value2)
+        expect( result[:result] ).to be false
+        expect( result[:err_msg] ).to match(/Key write failed/)
+        FileUtils.chmod(0770, key_parent_dir)
+        expect( @plugin.get(key)[:result] ).to eq value1
+      end
+    end
   end
 
 end
