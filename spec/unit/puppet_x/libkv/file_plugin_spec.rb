@@ -297,27 +297,26 @@ describe 'libkv file plugin anonymous class' do
              file = File.open(key_file, 'r')
              file.flock(File::LOCK_EX)
              locked = true
-             (1..5).each do |x|
-               puts "     >> Releasing lock in #{5 - x} seconds"
-               sleep 1
-             end
-             puts '     >> Lock released'
+             # pause the thread
+             Thread.stop
              file.flock(File::LOCK_UN)
+             puts '     >> Lock released'
           end
 
-          get_thread = Thread.new do
-            # wait for locker thread to spin up, lock the file
-            while !locked
-              sleep 0.5
-            end
-            puts "     >> Executing get for key file #{key_file}"
-            result = @plugin.get('key1')
-            expect( result.has_key?(:value) ).to be false
-            expect( result[:err_msg] ).to match /Timed out waiting for key file lock/
-          end
+          sleep 0.5 while !locked
+          puts "     >> Executing get for key file #{key_file}"
+          result = @plugin.get('key1')
+          expect( result.has_key?(:value) ).to be false
+          expect( result[:err_msg] ).to match /Timed out waiting for key file lock/
         ensure
-          locker_thread.join unless locker_thread.nil?
-          get_thread.join unless get_thread.nil?
+          if locker_thread
+            # wait until thread paused
+            sleep 0.5 while locker_thread.status != 'sleep'
+
+            # resume and then wait until thread completed
+            locker_thread.run
+            locker_thread.join
+          end
         end
       end
 

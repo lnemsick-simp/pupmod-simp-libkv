@@ -10,14 +10,14 @@ describe 'libkv::get' do
     is_expected.to run.with_params({}).and_raise_error(Exception);
   end
   providers.each do |providerinfo|
-    provider = providerinfo["name"]
-    url = providerinfo["url"]
-    auth = providerinfo["auth"]
+    provider = providerinfo['provider']
+    url = providerinfo['url']
+    auth = providerinfo['auth']
     shared_params = {
-      "url" => url,
-      "serialize" => providerinfo["serialize"],
-      "mode" => providerinfo["mode"],
-      "auth" => auth,
+      'url' => url,
+      'serialize' => providerinfo['serialize'],
+      'mode' => providerinfo['mode'],
+      'auth' => auth,
     }
     context "when provider = #{provider}" do
       it 'should throw an exception when "key" is missing' do

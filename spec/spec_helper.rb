@@ -88,7 +88,7 @@ RSpec.configure do |c|
   c.trusted_server_facts = true
 
   c.mock_framework = :rspec
-  c.mock_with :mocha
+  c.mock_with :rspec
 
   c.module_path = File.join(fixture_path, 'modules')
   c.manifest_dir = File.join(fixture_path, 'manifests')
@@ -143,12 +143,6 @@ RSpec.configure do |c|
     elsif defined?(class_name)
       set_hieradata(class_name.gsub(':','_'))
     end
-=begin
-    ########## CUSTOM ##########
-FIXME: re-enable when consul tests are fixed
-    `curl -sX DELETE http://172.17.0.1:10500/v1/kv/puppet?recurse`
-    `curl -sX DELETE http://172.17.0.1:10504/v1/kv/puppet?recurse`
-=end
   end
 
   c.after(:each) do
@@ -167,160 +161,77 @@ Dir.glob("#{RSpec.configuration.module_path}/*").each do |dir|
 end
 
 ########## CUSTOM ##########
-def datatype_testspec
+def testdata
   [
-    # Test Number
+    # Test String containing valid UTF-8
     {
-      :key => 'test_number',
-      :value => 255,
-      :nonserial_retval => '255',
-      :nonserial_class => 'String',
-      :class => 'Integer',
-      :puppet_type => 'Integer',
+      :key => 'test_string_valid_utf8',
+      :value => 'test1'
     },
-    # Test String
+=begin
+    # Test String containing binary whose encoding says UTF-8, but whose byte
+    # sequence is malformed UTF-8
     {
-      :key => 'test_string',
-      :value => 'test1',
-      :nonserial_retval => 'test1',
-      :nonserial_class => 'String',
-      :class => 'String',
-      :puppet_type => 'String',
+      :key => 'test_binary_string_bad_utf8',
+      :value => 'test1'
     },
+    # Test String containing binary whose encoding is ASCII-8BIT
+    {
+      :key => 'test_binary_string_ascii_8bit',
+      :value => 'test1'
+    },
+=end
     # Test Boolean
     {
       :key => 'test_boolean',
-      :value => true,
-      :nonserial_retval => 'true',
-      :nonserial_class => 'String',
-      :class => 'TrueClass',
-      :puppet_type => 'Boolean',
+      :value => true
     },
-=begin
+    # Test Number
+    {
+      :key => 'test_number',
+      :value => 255
+    },
     # Test Float
     {
       :key => 'test_float',
-      :value => 2.38490,
-      :nonserial_retval => '2.3849',
-      :nonserial_class => 'String',
-      :class => 'Float',
-      :puppet_type => 'Float',
+      :value => 2.38490
     },
-    # Test Array
+    # Test Array[String]
     {
-      :key => 'test_array',
-      :value => ['test3', 'test4'],
-      :nonserial_retval => '["test3", "test4"]',
-      :nonserial_class => 'String',
-      :class => 'Array',
-      :puppet_type => 'Array',
+      :key => 'test_array_strings',
+      :value => ['test3', 'test4']
+    },
+    # Test Array[Number]
+    {
+      :key => 'test_array_numbers',
+      :value => [20, 30]
     },
     # Test Hash
     {
       :key => 'test_hash',
-      :value => {'key' => 'test', 'value' => 'test2'},
-      :nonserial_retval => '{"key"=>"test", "value"=>"test2"}',
-      :nonserial_class => 'String',
-      :class => 'Hash',
-      :puppet_type => 'Hash',
-    },
-=end
+      :value => {
+        'key1' => 'test_string',
+        'key2' => 1000,
+        'key3' => false,
+        'key4' => { 'nestedkey1' => 'nested_test_string' }
+      }
+    }
   ]
 end
 
-def providers()
-  path = File.join(File.dirname(__FILE__), 'support')
+# plugins that can be exercised in a unit test
+def plugins
   [
     {
-      'name'      => 'mock with serialize false',
-      'url'       => 'mock://',
-      'serialize' => false,
+      'description' => 'mock',
+      'plugin'      => 'mock'
     },
     {
-      'name' => 'mock with serialize true and mode is unset',
-      'url' => 'mock://',
-      'serialize' => true,
+      'description' => 'file on local filesystem',
+      'plugin'    => 'file',
+#FIXME need to create this dynamically
+      'root_path' => File.join(Puppet[:environmentpath] , 'libkv', 'file')
     },
-    # {
-    # 'name' => "mock with serialize true and mode is 'native'",
-    # 'url' => 'mock://',
-    #         'serialize' => true,
-    # 'mode' => 'native',
-    # },
-=begin
-FIXME: re-enable when consul tests are fixed
-    {
-        'name' => 'consul with serialize false and with daemon',
-        'url' => 'consul://172.17.0.1:10500/puppet',
-        'serialize' => false,
-        'softfail' => false,
-        'should_error' => false,
-    },
-    {
-        'name' => 'consul with serialize true and mode is unset and with daemon',
-        'url' => 'consul://172.17.0.1:10500/puppet',
-        'serialize' => true,
-        'softfail' => false,
-        'should_error' => false,
-    },
-    # {
-    #   'name' => "consul with serialize true and mode is 'native' and with daemon",
-    #   'url' => 'consul://172.17.0.1:8500/puppet',
-    #   'serialize' => true,
-    #   'mode' => 'native',
-    #   'softfail' => false,
-    #   'should_error' => false,
-    #  },
-    {
-        'name' => 'consul with ssl and without auth and with daemon and multiple path segments',
-        'url' => 'consul+ssl+noverify://172.17.0.1:10501/puppet/default/',
-        'serialize' => true,
-        'softfail' => false,
-        'should_error' => false,
-    },
-    {
-#FIXME  This looks identical to the previous
-        'name' => 'consul with ssl and without auth and with daemon',
-        'url' => 'consul+ssl+noverify://172.17.0.1:10501/puppet',
-        'serialize' => true,
-        'softfail' => false,
-        'should_error' => false,
-    },
-    {
-        'name' => 'consul with ssl and with server verification and with daemon',
-        'url' => 'consul+ssl+verify://172.17.0.1:10501/puppet',
-        'auth' => {
-            'ca_file' => "#{path}/test/ca.crt",
-        },
-        'serialize' => true,
-        'softfail' => false,
-        'should_error' => false,
-    },
-    {
-      'name' => 'consul with ssl and with server verification and certificate auth and with daemon',
-      'url' => 'consul+ssl+verify://172.17.0.1:10503/puppet',
-      'auth' => {
-        'ca_file' => "#{path}/test/ca.crt",
-        'cert_file' => "#{path}/test/server.crt",
-        'key_file' => "#{path}/test/server.key",
-      },
-      'serialize' => true,
-      'softfail' => false,
-      'should_error' => false,
-    },
-#    {
-#      'name' => 'consul without daemon and softfail = false',
-#      'url' => 'consul://172.17.0.1:8500/puppet',
-#      'softfail' => false,
-#      'should_error' => true,
-#    },
-#    {
-#      'name' => 'consul without daemon and softfail = true',
-#      'url' => 'consul://172.17.0.1:8500/puppet',
-#      'softfail' => true,
-#      'should_error' => false,
-#    },
-=end
   ]
 end
 
