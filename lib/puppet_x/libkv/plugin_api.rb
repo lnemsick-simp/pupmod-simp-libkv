@@ -1,0 +1,239 @@
+
+#
+# Copy this file to my_plugin.rb and fill in the methods
+# on a local filesystem
+
+# Each plugin **MUST** be an anonymous class accessible only through
+# a `plugin_class` local variable.
+plugin_class = Class.new do
+
+  # Reminder:  Do **NOT** try to set constants in this Class.new block.
+  #            They don't do what you expect (are not accessible within
+  #            any class methods) and pollute the Object namespace.
+
+  ###### Public Plugin API ######
+
+  # @return String. backend type
+  def self.type
+    # This is the value that will be in the 'type' attribute of a configuration
+    # block for this plugin.  The adapter needs this class method in order to
+    # lookup this class in its hash of classes when it needs to create an
+    # instance.
+    'dummy'
+  end
+
+
+  # construct an instance of this plugin using global and plugin-specific
+  # configuration found in options
+  #
+  # The plugin-specific configuration will be found in
+  # `options['backends'][ options['backend'] ]`
+  #
+  # For example,
+  # {
+  #   # global options
+  #   'environment' => 'production',  # <== environment for the node
+  #   'softfail'    => false, # <== for use by libkv Puppet functions
+  #
+  #   # specific backend config to use
+  #   'backend' => 'dummy_1', # <== tells you which config to use
+  #
+  #   # config for all backend instances
+  #   'backends' => {
+  #     'default => {
+  #     },
+  #     ...
+  #     'dummy_1' => {         # <== config for this instance of 'dummy'
+  #       'plugin' => 'dummy',      # <== plugin to use
+  #       'id' => 'dummy_number_1', # <== specific instance of this plugin
+  #       'foo' => 'bar',
+  #       ...
+  #     },
+  #     'dummy_2' => {        # <== config for a difference instance of 'dummy'
+  #       'plugin' => 'dummy',
+  #       'id' => 'dummy_number_2',
+  #       'foo' => 'baz,'
+  #       ...
+  #     }
+  #   }
+  #
+  # @param name Name to ascribe to this plugin instance
+  # @param options Hash of global libkv and backend-specific options
+  # @raise RuntimeError if any required configuration is missing from options
+  #   or this object can't set up any stateful objects it needs to do its work
+  #   (e.g., file directory, connection to a backend)
+  def initialize(name, options)
+    # save this off, because the libkv adapter will access it through a getter
+    # (defined below) when constructing log messages
+    @name = name
+
+    # insert validation and set up code here
+
+    Puppet.debug("#{@name} libkv plugin constructed")
+  end
+
+  # @return unique identifier assigned to this plugin instance
+  def name
+    @name
+  end
+
+
+  # The remaining methods in this API map one-for-one to those in
+  # libkv's Puppet function API.
+  #
+  # IMPORTANT NOTES:
+  #
+  # - All values persisted and returned are Strings.  Other software in the
+  #   libkv function chain is responsible for serializing non-String
+  #   values into Strings for plugins to persist and then deserializing
+  #   Strings retrieved by plugins back into objects.
+  #
+  # - Each of the API methods return a results object that is a Hash
+  #   with 2 keys:
+  #
+  #   * :result - The result of the operation.  Operation specific.
+  #   * :err_msg - A String you set to an error message that is meaningful
+  #     to the end user, upon failure.
+  #
+  # - Although the libkv adapter will rescue any exceptions thrown, each of
+  #   these methods should do its very best to rescue all exceptions itself,
+  #   and then convert the exceptions to a failed status result with a
+  #   meaningful error message.
+  #
+  #         >> Only you have the domain knowledge <<
+  #         >> to create useful error messages!   <<
+  #
+
+  # Deletes a `key` from the configured backend.
+  #
+  # @param key String key
+  #
+  # @return results Hash
+  #   * :result - Boolean indicating whether operation succeeded
+  #   * :err_msg - String. Explanatory text upon failure; nil otherwise.
+  #
+  def delete(key)
+
+    # insert code that connects to the backend an affects the delete
+    # operation
+    #
+    # - This delete should be done atomically
+    # - Convert any exceptions into a failed status result with a meaningful
+    #   error message.
+    #
+
+    { :result => false, :err_msg => 'not implemented' }
+  end
+
+  # Deletes a whole folder from the configured backend.
+  #
+  # @param keydir String key folder path
+  #
+  # @return results Hash
+  #   * :result - Boolean indicating whether operation succeeded
+  #   * :err_msg - String. Explanatory text upon failure; nil otherwise.
+  #
+  def deletetree(keydir)
+
+    # insert code that connects to the backend an affects the deletetree
+    # operation
+    #
+    # - If supported, this deletetree should be done atomically.  If not,
+    #   it can be best-effort.
+    # - Convert any exceptions into a failed status result with a meaningful
+    #   error message.
+    #
+
+    { :result => false, :err_msg => 'not implemented' }
+  end
+
+  # Returns whether the `key` exists in the configured backend.
+  #
+  # @param key String key
+  #
+  # @return results Hash
+  #   * :result - Boolean indicating whether key exists; nil if could not
+  #     be determined
+  #   * :err_msg - String. Explanatory text when status could not be
+  #     determined; nil otherwise.
+  #
+  def exists(key)
+
+    # insert code that connects to the backend an affects the exists
+    # operation
+    #
+    # - Convert any exceptions into a failed status result with a meaningful
+    #   error message.
+    #
+
+    { :result => nil, :err_msg => 'not implemented' }
+  end
+
+  # Retrieves the value stored at `key` from the configured backend.
+  #
+  # @param key String key
+  #
+  # @return results Hash
+  #   * :result - String. Retrieved value for the key; nil if could not
+  #     be retrieved
+  #   * :err_msg - String. Explanatory text upon failure; nil otherwise.
+  #
+  def get(key)
+
+    # insert code that connects to the backend an affects the get
+    # operation
+    #
+    # - If possible, this get should be done atomically
+    # - Convert any exceptions into a failed status result with a meaningful
+    #   error message.
+    #
+
+    { :result => nil, :err_msg => 'not implemented' }
+  end
+
+  # Returns a list of all keys/value pairs in a folder
+  #
+  # This implementation is best effort.  It will attempt to retrieve the
+  # information in a folder and only fail if the folder itself cannot be
+  # accessed.  Individual key retrieval failures will be ignored.
+  #
+  # @return results Hash
+  #   * :result - Hash of retrieved key/value pairs; nil if the
+  #     retrieval operation failed
+  #   * :err_msg - String. Explanatory text upon failure; nil otherwise.
+  #
+  def list(keydir)
+
+    # insert code that connects to the backend an affects the list
+    # operation
+    #
+    # - Convert any exceptions into a failed status result with a meaningful
+    #   error message.
+    #
+
+    { :result => nil, :err_msg => 'not implemented' }
+  end
+
+  # Sets the data at `key` to a `value` in the configured backend.
+  #
+  # @param key String key
+  # @param value String value
+  #
+  # @return results Hash
+  #   * :result - Boolean indicating whether operation succeeded
+  #   * :err_msg - String. Explanatory text upon failure; nil otherwise.
+  #
+  def put(key, value)
+
+    # insert code that connects to the backend an affects the put
+    # operation
+    #
+    # - This delete should be done atomically
+    # - Convert any exceptions into a failed status result with a meaningful
+    #   error message.
+    #
+
+    { :result => false, :err_msg => 'not implemented' }
+  end
+
+end
