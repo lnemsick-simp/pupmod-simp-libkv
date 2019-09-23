@@ -365,38 +365,6 @@ simp_libkv_adapter_class = Class.new do
     plugin_instances[name]
   end
 
-  #FIXME This should use Puppet's serialization code so that
-  # all contained Binary strings in the value object are properly serialized
-  def serialize(value, metadata)
-    if value.is_a?(String)
-      enscapsulation = serialize_string_value(value, metadata)
-    else
-      encapsulation = { 'value' => value, 'metadata' => metadata }
-    end
-    encapsulation.to_json
-  end
-
-  def serialize_string_value(value, metadata)
-    normalized_value = value.dup
-    if (normalized_value.encoding == 'UTF-8') && !normalized_value.valid_encoding?
-      normalized_value.force_encoding('ASCII-8BIT')
-    end
-
-    if normalized_value.encoding == 'ASCII-8BIT'
-      encoded_value = Base64.strict_encode64(normalized_value)
-      encapsulation = {
-        'value' => encoded_value,
-        'encoding' => 'base64',
-        'original_encoding' => 'ASCII-8BIT',
-        'metadata' => metadata
-      }
-    else
-      encapsulation = { 'value' => value, 'metadata' => metadata }
-    end
-    encapsulation
-  end
-
-
   #FIXME This should use Puppet's deserialization code so that
   # all contained Binary strings in the value object are properly deserialized
   def deserialize(serialized_value)
@@ -433,4 +401,36 @@ simp_libkv_adapter_class = Class.new do
 
     value
   end
+
+  #FIXME This should use Puppet's serialization code so that
+  # all contained Binary strings in the value object are properly serialized
+  def serialize(value, metadata)
+    if value.is_a?(String)
+      enscapsulation = serialize_string_value(value, metadata)
+    else
+      encapsulation = { 'value' => value, 'metadata' => metadata }
+    end
+    encapsulation.to_json
+  end
+
+  def serialize_string_value(value, metadata)
+    normalized_value = value.dup
+    if (normalized_value.encoding == 'UTF-8') && !normalized_value.valid_encoding?
+      normalized_value.force_encoding('ASCII-8BIT')
+    end
+
+    if normalized_value.encoding == 'ASCII-8BIT'
+      encoded_value = Base64.strict_encode64(normalized_value)
+      encapsulation = {
+        'value' => encoded_value,
+        'encoding' => 'base64',
+        'original_encoding' => 'ASCII-8BIT',
+        'metadata' => metadata
+      }
+    else
+      encapsulation = { 'value' => value, 'metadata' => metadata }
+    end
+    encapsulation
+  end
+
 end

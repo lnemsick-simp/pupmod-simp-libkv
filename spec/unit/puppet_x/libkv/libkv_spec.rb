@@ -37,9 +37,6 @@ describe 'libkv adapter anonymous class' do
     FileUtils.remove_entry_secure(@tmpdir)
   end
 
-  let(:binary_file) {
-    File.join('..', '..', '..', 'support', 'binary_data', 'test_krb5.keytab')
-  }
 
   context 'constructor' do
     it 'should load valid plugin classes' do
@@ -213,24 +210,88 @@ describe 'libkv adapter anonymous class' do
   end
 
   context 'serialization operations' do
-    let(:testdata) { [
-      true,
-      false,
-      'valid UTF-8 string',
-      IO.read(File.join('..','..','
-      # ASCII-8bit
-    ] }
-
-    context '#serialize' do
+    before(:each) do
+      @adapter = simp_libkv_adapter_class.new
     end
 
-    context '#serialize_string_value' do
+    let(:metadata) { {
+      'foo' => 'bar',
+      'baz' => 42
+    } }
+
+    binary_file1_content = IO.read(
+      File.join('..', '..', '..', 'support', 'binary_data', 'test_krb5.keytab')
+    ).force_encoding('ASCII-8BIT')
+
+    binary_file2_content = IO.read(
+      File.join('..', '..', '..', 'support', 'binary_data', 'random')
+    ).force_encoding('ASCII-8BIT')
+
+    testvalues = {
+      'Boolean' => {
+        :value            =>true,
+        :serialized_value => "{'value':true,'foo':'bar','baz':42}"
+      },
+      'String valid UTF-8' =>  {
+        :value => 'some string',
+        :serialized_value => "{'value':'valid UTF-8','foo':'bar','baz':42}"
+      },
+      'String malformed UTF-8' => {
+        :value            => binary_file1_content.dup.force_encoding('UTF-8'),
+        :serialized_value =>
+          "{'value':'valid UTF-8'," +
+          "'foo':'bar','baz':42}"
+      },
+      'String ASCII-8BIT' => {
+        :value            => binary_file2_content,
+        :serialized_value =>
+          "{'value':'valid UTF-8'," +
+          "'foo':'bar','baz':42}"
+      },
+      'Integer' => {
+        :value            => 255,
+        :serialized_value =>  "{'value':255,'foo':'bar','baz':42}"
+      },
+      'Float' => {
+        :value            => 2.38490,
+        :serialized_value => "{'value':2.38490,'foo':'bar','baz':42}"
+      },
+      'Array of valid UTF-8 strings' => {
+        :value            => [ 'valid UTF-8 1', 'valid UTF-8 2'],
+        :serialized_value =>
+          "{'value':'valid UTF-8'," +
+          "'foo':'bar','baz':42}"
+      },
+=begin
+can't handle this correctly yet
+      'Array of invalid UTF-8 strings' => {
+        :value            => [ binary_file2_content ],
+        :serialized_value =>  TBD
+      },
+=end
+      'Hash' => {
+        :value => {
+          'key1' => 'test_string',
+          'key2' => 1000,
+          'key3' => false,
+          'key4' => { 'nestedkey1' => 'nested_test_string' }
+        },
+        :serialized_value =>
+          "{'value':'valid UTF-8'," +
+          "'foo':'bar','baz':42}"
+      }
+    }
+
+    context '#serialize and #serialize_string_value' do
+      testvalues.each do |summary,info|
+        it "should properly serialize #{summary}" do
+          expect( @adapter.serialize(info[:value], metadata) ).
+            to eq info[:serialized_value]
+        end
+      end
     end
 
-    context '#deserialize' do
-    end
-
-    context '#deserialize_string_value' do
+    context '#deserialize and #deserialize_string_value' do
     end
   end
 
