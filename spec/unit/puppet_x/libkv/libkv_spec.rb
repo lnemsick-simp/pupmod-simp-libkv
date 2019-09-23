@@ -3,109 +3,267 @@ require 'spec_helper'
 require 'fileutils'
 require 'tmpdir'
 
-# mimic loading that is done in libkv.rb
-project_dir = File.join(File.dirname(__FILE__), '..', '..', '..', '..')
-plugin_file = File.join(project_dir, 'lib', 'puppet_x', 'libkv', 'file_plugin.rb')
-plugin_class = nil
+# mimic loading that is done in loader.rb, but be sure to load what is in
+# the fixtures dir
+project_dir = File.expand_path(File.join(File.dirname(__FILE__), '..', '..', '..', '..', 'spec', 'fixtures', 'modules', 'libkv'))
+libkv_adapter_file = File.join(project_dir, 'lib', 'puppet_x', 'libkv', 'libkv.rb')
+simp_libkv_adapter_class = nil
 obj = Object.new
-obj.instance_eval(File.read(plugin_file), plugin_file)
-
-def locked_key_file_operation(root_path, key, value, &block)
-  # create the file to be locked
-  key_file = File.join(root_path, key)
-  File.open(key_file, 'w') { |file| file.write(value) }
-
-  locker_thread = nil   # thread that will lock the file
-  mutex = Mutex.new
-  locked = ConditionVariable.new
-  begin
-    locker_thread = Thread.new do
-      puts "     >> Locking key file #{key_file}"
-      file = File.open(key_file, 'r')
-      file.flock(File::LOCK_EX)
-
-      # signal the lock has taken place
-      mutex.synchronize { locked.signal }
-
-      # pause the thread until we are done our access attempt
-      Thread.stop
-      file.close
-      puts '     >> Lock released with close'
-    end
+obj.instance_eval(File.read(libkv_adapter_file), libkv_adapter_file)
 
 
-    # wait for the thread to signal the lock has taken place
-    mutex.synchronize { locked.wait(mutex) }
+describe 'libkv adapter anonymous class' do
 
-    # exercise the accessor
-    block.call
+# Going to use file plugin and the test plugins in spec/support/test_plugins
+# for these unit tests.
 
-  ensure
-    if locker_thread
-      # wait until thread has paused
-      sleep 0.5 while locker_thread.status != 'sleep'
-
-      # resume and then wait until thread completed
-      locker_thread.run
-      locker_thread.join
-    end
+  before(:each) do
+    # set up configuration for the file plugin
+    @tmpdir = Dir.mktmpdir
+    @root_path = File.join(@tmpdir, 'libkv', 'file')
+    @options = {
+      'backend'  => 'test',
+      'backends' => {
+        'test'  => {
+          'id'        => 'test',
+          'type'      => 'file',
+          'root_path' => @root_path
+        }
+      }
+    }
   end
 
-end
-
-describe 'libkv file plugin anonymous class' do
-  context 'type' do
-    it "class.type should return 'file'" do
-      expect(plugin_class.type).to eq 'file'
-    end
+  after(:each) do
+    FileUtils.remove_entry_secure(@tmpdir)
   end
+
+  let(:binary_file) {
+    File.join('..', '..', '..', 'support', 'binary_data', 'test_krb5.keytab')
+  }
 
   context 'constructor' do
-    context 'success cases' do
-      before(:each) do
-        @tmpdir = Dir.mktmpdir
-        @root_path = File.join(@tmpdir, 'libkv', 'file')
-        @options = {
-          'backend'  => 'test',
-          'backends' => {
-            'test'  => {
-              'id'        => 'test',
-              'type'      => 'file',
-              'root_path' => @root_path
-            }
-          }
-        }
+    it 'should load valid plugin classes' do
+      expect{ simp_libkv_adapter_class.new }.to_not raise_error
+      adapter = simp_libkv_adapter_class.new
+      expect( adapter.plugin_classes ).to_not be_empty
+      expect( adapter.plugin_classes.keys.include?('file') ).to be true
+    end
+
+    it 'should discard a plugin class with malformed Ruby' do
+      allow(Puppet).to receive(:warning)
+      adapter = simp_libkv_adapter_class.new
+      expect(Puppet).to have_received(:warning).with(/libkv plugin from .* failed to load/)
+    end
+  end
+
+  context 'helper methods' do
+    before(:each) do
+      @adapter = simp_libkv_adapter_class.new
+    end
+
+    context '#normalize_key' do
+      let(:key) { 'my/test/key' }
+      let(:normalized_key) { 'production/my/test/key' }
+      it 'should add the environment in options with :add_env operation' do
+        opts = {'environment' => 'production'}
+        expect( @adapter.normalize_key(key, opts) ).to eq normalized_key
       end
 
-      after(:each) do
-        FileUtils.remove_entry_secure(@tmpdir)
+      it 'should leave key intact when no environment specified in options with :add_env operation' do
+        expect( @adapter.normalize_key(key, {}) ).to eq key
       end
 
-      it 'should create the root_path tree when none exists' do
-        expect{ plugin_class.new('file/test', @options) }.to_not raise_error
-        expect( File.exist?(@root_path) ).to be true
+      it 'should leave key intact when empty environment specified in options with :add_env operation' do
+        opts = {'environment' => ''}
+        expect( @adapter.normalize_key(key, opts) ).to eq key
       end
 
-      it 'should not fail if the root_path tree exists' do
-        FileUtils.mkdir_p(@root_path)
-        expect { plugin_class.new('file/test', @options) }.to_not raise_error
+      it 'should remove the environment in options with :remove_env operation' do
+        opts = {'environment' => 'production'}
+        expect( @adapter.normalize_key(normalized_key, opts, :remove_env) ).to eq key
       end
 
-      it 'should fix the permissions of root_path' do
-        FileUtils.mkdir_p(@root_path, :mode => 0755)
-        expect{ plugin_class.new('file/test', @options) }.to_not raise_error
-        expect( File.stat(@root_path).mode & 0777 ).to eq 0750
+      it 'should leave key intact when no environment specified in options with :remove_env operation' do
+        expect( @adapter.normalize_key(normalized_key, {}, :remove_env) ).to eq normalized_key
+      end
+
+      it 'should leave key intact when empty environment specified in options with :remove_env operation' do
+        opts = {'environment' => ''}
+        expect( @adapter.normalize_key(normalized_key, opts, :remove_env) ).to eq normalized_key
+      end
+
+      it 'should leave key intact with any other operation' do
+        opts = {'environment' => 'production'}
+        expect( @adapter.normalize_key(normalized_key, opts, :oops) ).to eq normalized_key
       end
     end
 
+    context '#plugin_instance' do
+      context 'success cases' do
+        it 'should create an instance when config is correct' do
+          instance = @adapter.plugin_instance(@options)
+
+          file_class_id = @adapter.plugin_classes['file'].to_s
+          expect( instance.name ).to eq 'file/test'
+          expect( instance.to_s ).to match file_class_id
+        end
+
+        it 'should retrieve an existing instance' do
+          instance1 = @adapter.plugin_instance(@options)
+          instance1_id = instance1.to_s
+
+          instance2 = @adapter.plugin_instance(@options)
+          expect(instance1_id).to eq(instance2.to_s)
+        end
+      end
+
+      context 'error cases' do
+        it 'should fail when options is not a Hash' do
+          expect { @adapter.plugin_instance('oops') }.
+            to raise_error(/libkv Internal Error: Malformed backend config/)
+        end
+
+        it "should fail when options missing 'backend' key" do
+          expect { @adapter.plugin_instance({}) }.
+            to raise_error(/libkv Internal Error: Malformed backend config/)
+        end
+
+        it "should fail when options missing 'backends' key" do
+          options = {
+            'backend' => 'test'
+          }
+          expect { @adapter.plugin_instance(options) }.
+            to raise_error(/libkv Internal Error: Malformed backend config/)
+        end
+
+        it "should fail when options 'backends' key is not a Hash" do
+          options = {
+            'backend'  => 'test',
+            'backends' => 'oops'
+          }
+          expect { @adapter.plugin_instance(options) }.
+            to raise_error(/libkv Internal Error: Malformed backend config/)
+        end
+
+        it "should fail when options 'backends' does not have the specified backend" do
+          options = {
+            'backend'  => 'test',
+            'backends' => {
+              'test1' => { 'id' => 'test', 'type' => 'consul'}
+            }
+          }
+          expect { @adapter.plugin_instance(options) }.
+            to raise_error(/libkv Internal Error: Malformed backend config/)
+        end
+
+        it "should fail when the correct 'backends' element has no 'id' key" do
+          options = {
+            'backend' => 'test',
+            'backends' => {
+              'test1' => { 'id' => 'test', 'type' => 'consul'},
+              'test'  => {}
+            }
+          }
+          expect { @adapter.plugin_instance(options) }.
+            to raise_error(/libkv Internal Error: Malformed backend config/)
+        end
+
+        it "should fail when the correct 'backends' element has no 'type' key" do
+          options = {
+            'backend'  => 'test',
+            'backends' => {
+              'test1' => { 'id' => 'test', 'type' => 'consul'},
+              'test'  => { 'id' => 'test' }
+            }
+          }
+          expect { @adapter.plugin_instance(options) }.
+            to raise_error(/libkv Internal Error: Malformed backend config/)
+        end
+
+        it "should fail when the correct 'backends' element has wrong 'type' value" do
+          options = {
+            'backend'  => 'test',
+            'backends' => {
+              'test1' => { 'id' => 'test', 'type' => 'consul'},
+              'test'  => { 'id' => 'test', 'type' => 'filex' }
+            }
+          }
+          expect { @adapter.plugin_instance(options) }.
+            to raise_error(/libkv Internal Error: Malformed backend config/)
+        end
+
+
+        it 'should fail when plugin instance cannot be created' do
+          options = {
+            'backend'  => 'test',
+            'backends' => {
+              'test'  => { 'id' => 'test', 'type' => 'file' }
+            }
+          }
+
+          allow(Dir).to receive(:exist?).with('/var/simp/libkv/file/test').and_return( false )
+          allow(FileUtils).to receive(:mkdir_p).with('/var/simp/libkv/file/test').
+            and_raise(Errno::EACCES, 'Permission denied')
+
+          expect { @adapter.plugin_instance(options) }.
+            to raise_error(/libkv Error: Unable to construct 'file\/test'/)
+        end
+      end
+    end
+  end
+
+  context 'serialization operations' do
+    let(:testdata) { [
+      true,
+      false,
+      'valid UTF-8 string',
+      IO.read(File.join('..','..','
+      # ASCII-8bit
+    ] }
+
+    context '#serialize' do
+    end
+
+    context '#serialize_string_value' do
+    end
+
+    context '#deserialize' do
+    end
+
+    context '#deserialize_string_value' do
+    end
+  end
+
+  context 'public API' do
+    before(:each) do
+      @adapter = simp_libkv_adapter_class.new
+
+      # create our own file plugin instance so we can manipulate key/store
+      # independent of the libkv adapter
+      @plugin = @adapter.plugin_classes['file'].new('other', @options)
+    end
+
+    context '#backends' do
+      it 'should list available backend plugins' do
+        # currently only 1 plugins
+        expect( @adapter.backends ).to eq([ 'file' ])
+      end
+    end
+
+    context '#delete' do
+    end
+
+  end
+
+=begin
     context 'error cases' do
       it 'should fail when options is not a Hash' do
-        expect { plugin_class.new('file/test', 'oops') }.
+        expect { simp_libkv_adapter_class.new('file/test', 'oops') }.
           to raise_error(/libkv plugin file\/test misconfigured/)
       end
 
       it "should fail when options missing 'backend' key" do
-        expect { plugin_class.new('file/test', {} ) }.
+        expect { simp_libkv_adapter_class.new('file/test', {} ) }.
           to raise_error(/libkv plugin file\/test misconfigured: {}/)
       end
 
@@ -113,7 +271,7 @@ describe 'libkv file plugin anonymous class' do
         options = {
           'backend' => 'test'
         }
-        expect { plugin_class.new('file/test', options) }.
+        expect { simp_libkv_adapter_class.new('file/test', options) }.
           to raise_error(/libkv plugin file\/test misconfigured: {.*backend.*}/)
       end
 
@@ -122,7 +280,7 @@ describe 'libkv file plugin anonymous class' do
           'backend'  => 'test',
           'backends' => 'oops'
         }
-        expect { plugin_class.new('file/test', options) }.
+        expect { simp_libkv_adapter_class.new('file/test', options) }.
           to raise_error(/libkv plugin file\/test misconfigured/)
       end
 
@@ -133,7 +291,7 @@ describe 'libkv file plugin anonymous class' do
             'test1' => { 'id' => 'test', 'type' => 'consul'}
           }
         }
-        expect { plugin_class.new('file/test', options) }.
+        expect { simp_libkv_adapter_class.new('file/test', options) }.
           to raise_error(/libkv plugin file\/test misconfigured/)
       end
 
@@ -145,7 +303,7 @@ describe 'libkv file plugin anonymous class' do
             'test'  => {}
           }
         }
-        expect { plugin_class.new('file/test', options) }.
+        expect { simp_libkv_adapter_class.new('file/test', options) }.
           to raise_error(/libkv plugin file\/test misconfigured/)
       end
 
@@ -157,7 +315,7 @@ describe 'libkv file plugin anonymous class' do
             'test'  => { 'id' => 'test' }
           }
         }
-        expect { plugin_class.new('file/test', options) }.
+        expect { simp_libkv_adapter_class.new('file/test', options) }.
           to raise_error(/libkv plugin file\/test misconfigured/)
       end
 
@@ -169,12 +327,12 @@ describe 'libkv file plugin anonymous class' do
             'test'  => { 'id' => 'test', 'type' => 'filex' }
           }
         }
-        expect { plugin_class.new('file/test', options) }.
+        expect { simp_libkv_adapter_class.new('file/test', options) }.
           to raise_error(/libkv plugin file\/test misconfigured/)
       end
 
 
-      it 'should fail when root path cannot be created' do
+      it "should fail when root path cannot be created" do
         options = {
           'backend'  => 'test',
           'backends' => {
@@ -186,11 +344,11 @@ describe 'libkv file plugin anonymous class' do
         allow(FileUtils).to receive(:mkdir_p).with('/var/simp/libkv/file/test').
           and_raise(Errno::EACCES, 'Permission denied')
 
-        expect { plugin_class.new('file/test', options) }.
+        expect { simp_libkv_adapter_class.new('file/test', options) }.
           to raise_error(/libkv plugin file\/test Error: Unable to create .* Permission denied/)
       end
 
-      it 'should fail when root path permissions cannot be set' do
+      it "should fail when root path permissions cannot be set" do
         options = {
           'backend'  => 'test',
           'backends' => {
@@ -204,7 +362,7 @@ describe 'libkv file plugin anonymous class' do
         allow(FileUtils).to receive(:chmod).with(0750, '/var/simp/libkv/file/test').
           and_raise(Errno::EACCES, 'Permission denied')
 
-        expect { plugin_class.new('file/test', options) }.
+        expect { simp_libkv_adapter_class.new('file/test', options) }.
           to raise_error(/libkv plugin file\/test Error: Unable to set permissions .* Permission denied/)
       end
 
@@ -226,7 +384,7 @@ describe 'libkv file plugin anonymous class' do
           }
         }
       }
-      @plugin = plugin_class.new('file/test', @options)
+      @plugin = simp_libkv_adapter_class.new('file/test', @options)
     end
 
     after(:each) do
@@ -505,5 +663,6 @@ describe 'libkv file plugin anonymous class' do
       end
     end
   end
+=end
 
 end

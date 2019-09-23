@@ -1,0 +1,34 @@
+{
+  "name": "simp-test_plugins",
+  "version": "9.9.9",
+  "author": "simp",
+  "summary": "plugins for libkv error testing"
+  "license": "Apache-2.0",
+  "source": "https://github.com/simp/pupmod-simp-libkv",
+  "project_page": "https://github.com/simp/pupmod-simp-libkv",
+  "issues_url": "https://simp-project.atlassian.net",
+  "tags": [],
+  "dependencies": [],
+  "operatingsystem_support": [
+    {
+      "operatingsystem": "CentOS",
+      "operatingsystemrelease": [
+        "6",
+        "7"
+      ]
+    },
+    {
+      "operatingsystem": "RedHat",
+      "operatingsystemrelease": [
+        "6",
+        "7"
+      ]
+    }
+  ],
+  "requirements": [
+    {
+      "name": "puppet",
+      "version_requirement": ">= 5.0.0 < 7.0.0"
+    }
+  ]
+}

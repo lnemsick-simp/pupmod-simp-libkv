@@ -1,7 +1,5 @@
-
+# Copy this file to <plugin name>_plugin.rb and address the FIXMEs
 #
-# Copy this file to my_plugin.rb and fill in the methods
-# on a local filesystem
 
 # Each plugin **MUST** be an anonymous class accessible only through
 # a `plugin_class` local variable.
@@ -16,14 +14,13 @@ plugin_class = Class.new do
   # @return String. backend type
   def self.type
     # This is the value that will be in the 'type' attribute of a configuration
-    # block for this plugin.  The adapter needs this class method in order to
-    # lookup this class in its hash of classes when it needs to create an
-    # instance.
-    'dummy'
+    # block for this plugin.  The libkv adapter uses to select the plugin class to
+    # use in order to create a plugin instance.
+    'FIXME'
   end
 
 
-  # construct an instance of this plugin using global and plugin-specific
+  # Construct an instance of this plugin using global and plugin-specific
   # configuration found in options
   #
   # The plugin-specific configuration will be found in
@@ -33,26 +30,30 @@ plugin_class = Class.new do
   # {
   #   # global options
   #   'environment' => 'production',  # <== environment for the node
-  #   'softfail'    => false, # <== for use by libkv Puppet functions
+  #   'softfail'    => false,         # <== for use by libkv Puppet functions
   #
   #   # specific backend config to use
-  #   'backend' => 'dummy_1', # <== tells you which config to use
-  #
-  #   # config for all backend instances
-  #   'backends' => {
-  #     'default => {
-  #     },
-  #     ...
-  #     'dummy_1' => {         # <== config for this instance of 'dummy'
-  #       'plugin' => 'dummy',      # <== plugin to use
-  #       'id' => 'dummy_number_1', # <== specific instance of this plugin
-  #       'foo' => 'bar',
+  #   'backend' => 'example_1',      # <== tells you which config to use, i.e.,
+  #                                  #     the key in 'backends' Hash       ----
+  #                                                                            |
+  #   # config for all backend instances                                       |
+  #   'backends' => {                                                          |
+  #     'default => {           # <== config for an instance of 'file'         |
+  #       'type' => 'file',     # <== plugin to use                            |
+  #       'id'   => 'config_1', # <== unique instance id                       |
+  #       ...                                                                  |
+  #     },                                                                     |
+  #     ...                                                                    |
+  #     'example_1' => {        # <== config for an instance of 'example' <-----
+  #       'type' => 'example',  # <== plugin to use
+  #       'id'   => 'config_1', # <== unique instance id
+  #       'foo'  => 'bar',      # <== config specific to 'example' plugin
   #       ...
   #     },
-  #     'dummy_2' => {        # <== config for a difference instance of 'dummy'
-  #       'plugin' => 'dummy',
-  #       'id' => 'dummy_number_2',
-  #       'foo' => 'baz,'
+  #     'example_2' => {        # <== config for another instance of 'example'
+  #       'type' => 'example',
+  #       'id'   => 'config_2',
+  #       'foo'  => 'baz,'
   #       ...
   #     }
   #   }
@@ -67,7 +68,7 @@ plugin_class = Class.new do
     # (defined below) when constructing log messages
     @name = name
 
-    # insert validation and set up code here
+    # FIXME: insert validation and set up code here
 
     Puppet.debug("#{@name} libkv plugin constructed")
   end
@@ -114,7 +115,7 @@ plugin_class = Class.new do
   #
   def delete(key)
 
-    # insert code that connects to the backend an affects the delete
+    # FIXME: insert code that connects to the backend an affects the delete
     # operation
     #
     # - This delete should be done atomically
@@ -122,7 +123,7 @@ plugin_class = Class.new do
     #   error message.
     #
 
-    { :result => false, :err_msg => 'not implemented' }
+    { :result => false, :err_msg => 'FIXME: not implemented' }
   end
 
   # Deletes a whole folder from the configured backend.
@@ -135,7 +136,7 @@ plugin_class = Class.new do
   #
   def deletetree(keydir)
 
-    # insert code that connects to the backend an affects the deletetree
+    # FIXME: insert code that connects to the backend an affects the deletetree
     # operation
     #
     # - If supported, this deletetree should be done atomically.  If not,
@@ -144,7 +145,7 @@ plugin_class = Class.new do
     #   error message.
     #
 
-    { :result => false, :err_msg => 'not implemented' }
+    { :result => false, :err_msg => 'FIXME: not implemented' }
   end
 
   # Returns whether the `key` exists in the configured backend.
@@ -159,14 +160,14 @@ plugin_class = Class.new do
   #
   def exists(key)
 
-    # insert code that connects to the backend an affects the exists
+    # FIXME: insert code that connects to the backend an affects the exists
     # operation
     #
     # - Convert any exceptions into a failed status result with a meaningful
     #   error message.
     #
 
-    { :result => nil, :err_msg => 'not implemented' }
+    { :result => nil, :err_msg => 'FIXME: not implemented' }
   end
 
   # Retrieves the value stored at `key` from the configured backend.
@@ -180,7 +181,7 @@ plugin_class = Class.new do
   #
   def get(key)
 
-    # insert code that connects to the backend an affects the get
+    # FIXME: insert code that connects to the backend an affects the get
     # operation
     #
     # - If possible, this get should be done atomically
@@ -188,7 +189,7 @@ plugin_class = Class.new do
     #   error message.
     #
 
-    { :result => nil, :err_msg => 'not implemented' }
+    { :result => nil, :err_msg => 'FIXME: not implemented' }
   end
 
   # Returns a list of all keys/value pairs in a folder
@@ -204,14 +205,14 @@ plugin_class = Class.new do
   #
   def list(keydir)
 
-    # insert code that connects to the backend an affects the list
+    # FIXME: insert code that connects to the backend an affects the list
     # operation
     #
     # - Convert any exceptions into a failed status result with a meaningful
     #   error message.
     #
 
-    { :result => nil, :err_msg => 'not implemented' }
+    { :result => nil, :err_msg => 'FIXME: not implemented' }
   end
 
   # Sets the data at `key` to a `value` in the configured backend.
@@ -225,7 +226,7 @@ plugin_class = Class.new do
   #
   def put(key, value)
 
-    # insert code that connects to the backend an affects the put
+    # FIXME: insert code that connects to the backend an affects the put
     # operation
     #
     # - This delete should be done atomically
@@ -233,7 +234,7 @@ plugin_class = Class.new do
     #   error message.
     #
 
-    { :result => false, :err_msg => 'not implemented' }
+    { :result => false, :err_msg => 'FIXME: not implemented' }
   end
 
 end

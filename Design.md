@@ -114,13 +114,12 @@ a key/value store.
   * When the backend information is not specified, each function must
     look up the information in Hieradata when called.
 
-* Each function that uses a key parameter for an individual key/value pair
-  must automatically prepend the Puppet environment to that key, by default.
+* Each function that uses a key or keydir parameter must automatically
+  prepend the Puppet environment to that key, by default.
 
   * Stored information is generally isolated per Puppet environment.
   * To support storage of truly global information in a backend, the interface
     must provide a mechnism to disable this prepending.
-  * Prepending will not apply to `list` or `deletetree` operations.
 
 * The interface must allow additional metadata in the form of a Hash to
   be persisted/retrieved with the key-value pair.
@@ -489,10 +488,9 @@ The standard options available are as follows:
   was a retrieval operation (e.g., `get`), the returned value will be an
   appropriate empty/null object.  Defaults to `false`.
 * `environment`: String. When set to a non-empty string, the value is prepended
-  to the `key` parameter in individual key/value operations (i.e., all but
-  `list` or `deletetree`).  Should only be set to an empty string when the key
-  being accessed is truly global.  Defaults to the Puppet environment for the
-  node.
+  to the `key` or `keydir` parameters. Should only be set to an empty string
+  when the key being accessed is truly global.  Defaults to the Puppet
+  environment for the node.
 * `backend`: String.  Name of the backend to use.  Must be a key in the
   'backends' sub-Hash of the merged options Hash.  When absent, the libkv
    function will look for a backend whose name matches the calling Class,

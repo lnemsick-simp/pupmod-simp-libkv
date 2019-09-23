@@ -12,3 +12,4 @@ fixtures:
     compliance_markup: https://github.com/simp/pupmod-simp-compliance_markup
   symlinks:
     libkv: "#{source_dir}"
+    test_plugins: "#{File.join(source_dir, 'spec', 'support', 'test_plugins')}"
