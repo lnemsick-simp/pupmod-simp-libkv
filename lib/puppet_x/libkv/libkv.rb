@@ -180,7 +180,7 @@ simp_libkv_adapter_class = Class.new do
   #   * :result - Hash containing :value and :metadata keys; nil if could not
   #     be retrieved
   #     * :value = Retrieved value for the key
-  #     * :metadat = Retrieved metadata Hash for the key
+  #     * :metadata = Retrieved metadata Hash for the key
   #   * :err_msg - String. Explanatory text upon failure; nil otherwise.
   #
   def get(key, options)
@@ -237,7 +237,7 @@ simp_libkv_adapter_class = Class.new do
         raw_result = instance.list( normalize_key(keydir, options) )
         if raw_result[:result]
           result = { :result => {}, :err_msg => nil }
-          raw_result.each do |raw_key,raw_value|
+          raw_result[:result].each do |raw_key,raw_value|
             key = normalize_key(raw_key, options, :remove_env)
             result[:result][key] = deserialize(raw_value)
           end
@@ -370,16 +370,19 @@ simp_libkv_adapter_class = Class.new do
   # See limitations of #serialize() below
   #
   # @return Hash containing :value and :metadata keys
-  # @raise JSON::ParserError if the serialized_value does not
-  #   contain valid JSON
-  # @raise RuntimeError if the Hash representation of serialized_value does
-  # not contain a 'value' key or the optional 'encoding' key contains an
-  # unsupported encoding scheme.
+  # @raise RuntimeError if the serialized_value does not contain valid JSON,
+  #   if the Hash representation of serialized_value does not contain a 'value'
+  #   key, or the optional 'encoding' key contains an unsupported encoding
+  #   scheme.
   #
   #FIXME This should use Puppet's deserialization code so that
   # all contained Binary strings in the value object are properly deserialized
   def deserialize(serialized_value)
-    encapsulation = JSON.parse(serialized_value)
+    begin
+      encapsulation = JSON.parse(serialized_value)
+    rescue JSON::ParserError => e
+      raise("Failed to deserialize: JSON parse error: #{e}")
+    end
     unless encapsulation.has_key?('value')
       raise("Failed to deserialize: 'value' missing in '#{serialized_value}'")
     end

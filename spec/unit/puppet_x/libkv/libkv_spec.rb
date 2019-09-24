@@ -21,13 +21,33 @@ describe 'libkv adapter anonymous class' do
     # set up configuration for the file plugin
     @tmpdir = Dir.mktmpdir
     @root_path = File.join(@tmpdir, 'libkv', 'file')
-    @options = {
-      'backend'  => 'test',
-      'backends' => {
-        'test'  => {
+    options_base = {
+      'environment' => 'production',
+      'backends'    => {
+        # will use failer plugin for catastrophic error cases, because
+        # it is badly behaved and raises exceptions on all operations
+       'test_failer'  => {
+          'id'               => 'test',
+          'type'             => 'failer',
+          'fail_constructor' => false  # true = raise in constructor
+        },
+        # will use file plugin for non-catastrophic test cases
+        'test_file'  => {
           'id'        => 'test',
           'type'      => 'file',
           'root_path' => @root_path
+        }
+      }
+    }
+    @options_file   = options_base.merge ({ 'backend' => 'test_file' } )
+    @options_failer = options_base.merge ({ 'backend' => 'test_failer' } )
+    @options_failer_ctr = {
+      'backend'  => 'test_failer',
+      'backends' => {
+        'test_failer'  => {
+          'id'               => 'test',
+          'type'             => 'failer',
+          'fail_constructor' => true  # true = raise in constructor
         }
       }
     }
@@ -49,7 +69,7 @@ describe 'libkv adapter anonymous class' do
     it 'should discard a plugin class with malformed Ruby' do
       allow(Puppet).to receive(:warning)
       adapter = simp_libkv_adapter_class.new
-      expect(Puppet).to have_received(:warning).with(/libkv plugin from .* failed to load/)
+      expect(Puppet).to have_received(:warning).with(/libkv plugin from .*malformed_plugin.rb failed to load/)
     end
   end
 
@@ -98,7 +118,7 @@ describe 'libkv adapter anonymous class' do
     context '#plugin_instance' do
       context 'success cases' do
         it 'should create an instance when config is correct' do
-          instance = @adapter.plugin_instance(@options)
+          instance = @adapter.plugin_instance(@options_file)
 
           file_class_id = @adapter.plugin_classes['file'].to_s
           expect( instance.name ).to eq 'file/test'
@@ -106,10 +126,10 @@ describe 'libkv adapter anonymous class' do
         end
 
         it 'should retrieve an existing instance' do
-          instance1 = @adapter.plugin_instance(@options)
+          instance1 = @adapter.plugin_instance(@options_file)
           instance1_id = instance1.to_s
 
-          instance2 = @adapter.plugin_instance(@options)
+          instance2 = @adapter.plugin_instance(@options_file)
           expect(instance1_id).to eq(instance2.to_s)
         end
       end
@@ -191,19 +211,9 @@ describe 'libkv adapter anonymous class' do
 
 
         it 'should fail when plugin instance cannot be created' do
-          options = {
-            'backend'  => 'test',
-            'backends' => {
-              'test'  => { 'id' => 'test', 'type' => 'file' }
-            }
-          }
 
-          allow(Dir).to receive(:exist?).with('/var/simp/libkv/file/test').and_return( false )
-          allow(FileUtils).to receive(:mkdir_p).with('/var/simp/libkv/file/test').
-            and_raise(Errno::EACCES, 'Permission denied')
-
-          expect { @adapter.plugin_instance(options) }.
-            to raise_error(/libkv Error: Unable to construct 'file\/test'/)
+          expect { @adapter.plugin_instance(@options_failer_ctr) }.
+            to raise_error(/libkv Error: Unable to construct 'failer\/test'/)
         end
       end
     end
@@ -330,7 +340,7 @@ describe 'libkv adapter anonymous class' do
 
       it 'should fail when input is not in JSON format' do
         expect{ @adapter.deserialize('this is not JSON')}. to raise_error(
-          JSON::ParserError)
+          RuntimeError, /Failed to deserialize: JSON parse error/)
       end
 
       it "should fail when input does not have 'value' key" do
@@ -345,9 +355,6 @@ describe 'libkv adapter anonymous class' do
           RuntimeError, /Failed to deserialize: Unsupported encoding/)
       end
     end
-
-    context '#serialize and #deserialize' do
-    end
   end
 
   context 'public API' do
@@ -356,429 +363,174 @@ describe 'libkv adapter anonymous class' do
 
       # create our own file plugin instance so we can manipulate key/store
       # independent of the libkv adapter
-      @plugin = @adapter.plugin_classes['file'].new('other', @options)
+      @plugin = @adapter.plugin_classes['file'].new('other', @options_file)
     end
+
+    let(:key) { 'my/test/key' }
+    let(:key_plus_env) { 'production/my/test/key' }
+    let(:value) { 'some string' }
+    let(:metadata) { { 'foo' => 'bar' } }
+    let(:serialized_value) {
+      '{"value":"some string","metadata":{"foo":"bar"}}'
+    }
 
     context '#backends' do
       it 'should list available backend plugins' do
-        # currently only 1 plugins
-        expect( @adapter.backends ).to eq([ 'file' ])
+        # currently only 2 plugins (one real and one for test only)
+        expect( @adapter.backends ).to eq([ 'failer', 'file' ])
       end
     end
 
     context '#delete' do
-    end
+      it 'should return plugin delete result' do
+        @plugin.put(key_plus_env, serialized_value)
+        expect(@adapter.delete(key, @options_file)).
+          to eq({:result => true, :err_msg => nil})
 
-  end
-
-=begin
-    context 'error cases' do
-      it 'should fail when options is not a Hash' do
-        expect { simp_libkv_adapter_class.new('file/test', 'oops') }.
-          to raise_error(/libkv plugin file\/test misconfigured/)
+        expect(@plugin.exists(key_plus_env)).
+          to eq({:result => false, :err_msg => nil})
       end
 
-      it "should fail when options missing 'backend' key" do
-        expect { simp_libkv_adapter_class.new('file/test', {} ) }.
-          to raise_error(/libkv plugin file\/test misconfigured: {}/)
-      end
-
-      it "should fail when options missing 'backends' key" do
-        options = {
-          'backend' => 'test'
-        }
-        expect { simp_libkv_adapter_class.new('file/test', options) }.
-          to raise_error(/libkv plugin file\/test misconfigured: {.*backend.*}/)
-      end
-
-      it "should fail when options 'backends' key is not a Hash" do
-        options = {
-          'backend'  => 'test',
-          'backends' => 'oops'
-        }
-        expect { simp_libkv_adapter_class.new('file/test', options) }.
-          to raise_error(/libkv plugin file\/test misconfigured/)
-      end
-
-      it "should fail when options 'backends' does not have the specified backend" do
-        options = {
-          'backend'  => 'test',
-          'backends' => {
-            'test1' => { 'id' => 'test', 'type' => 'consul'}
-          }
-        }
-        expect { simp_libkv_adapter_class.new('file/test', options) }.
-          to raise_error(/libkv plugin file\/test misconfigured/)
-      end
-
-      it "should fail when the correct 'backends' element has no 'id' key" do
-        options = {
-          'backend' => 'test',
-          'backends' => {
-            'test1' => { 'id' => 'test', 'type' => 'consul'},
-            'test'  => {}
-          }
-        }
-        expect { simp_libkv_adapter_class.new('file/test', options) }.
-          to raise_error(/libkv plugin file\/test misconfigured/)
-      end
-
-      it "should fail when the correct 'backends' element has no 'type' key" do
-        options = {
-          'backend'  => 'test',
-          'backends' => {
-            'test1' => { 'id' => 'test', 'type' => 'consul'},
-            'test'  => { 'id' => 'test' }
-          }
-        }
-        expect { simp_libkv_adapter_class.new('file/test', options) }.
-          to raise_error(/libkv plugin file\/test misconfigured/)
-      end
-
-      it "should fail when the correct 'backends' element has wrong 'type' value" do
-        options = {
-          'backend'  => 'test',
-          'backends' => {
-            'test1' => { 'id' => 'test', 'type' => 'consul'},
-            'test'  => { 'id' => 'test', 'type' => 'filex' }
-          }
-        }
-        expect { simp_libkv_adapter_class.new('file/test', options) }.
-          to raise_error(/libkv plugin file\/test misconfigured/)
-      end
-
-
-      it "should fail when root path cannot be created" do
-        options = {
-          'backend'  => 'test',
-          'backends' => {
-            'test'  => { 'id' => 'test', 'type' => 'file' }
-          }
-        }
-
-        allow(Dir).to receive(:exist?).with('/var/simp/libkv/file/test').and_return( false )
-        allow(FileUtils).to receive(:mkdir_p).with('/var/simp/libkv/file/test').
-          and_raise(Errno::EACCES, 'Permission denied')
-
-        expect { simp_libkv_adapter_class.new('file/test', options) }.
-          to raise_error(/libkv plugin file\/test Error: Unable to create .* Permission denied/)
-      end
-
-      it "should fail when root path permissions cannot be set" do
-        options = {
-          'backend'  => 'test',
-          'backends' => {
-            'test'  => { 'id' => 'test', 'type' => 'file' }
-          }
-        }
-
-        allow(Dir).to receive(:exist?).with('/var/simp/libkv/file/test').and_return( false )
-        allow(FileUtils).to receive(:mkdir_p).with('/var/simp/libkv/file/test').
-          and_return(true)
-        allow(FileUtils).to receive(:chmod).with(0750, '/var/simp/libkv/file/test').
-          and_raise(Errno::EACCES, 'Permission denied')
-
-        expect { simp_libkv_adapter_class.new('file/test', options) }.
-          to raise_error(/libkv plugin file\/test Error: Unable to set permissions .* Permission denied/)
-      end
-
-    end
-  end
-
-  context 'public API' do
-    before(:each) do
-      @tmpdir = Dir.mktmpdir
-      @root_path = File.join(@tmpdir, 'libkv', 'file')
-      @options = {
-        'backend'  => 'test',
-        'backends' => {
-          'test'  => {
-            'id'                   => 'test',
-            'type'                 => 'file',
-            'root_path'            => @root_path,
-            'lock_timeout_seconds' => 1
-          }
-        }
-      }
-      @plugin = simp_libkv_adapter_class.new('file/test', @options)
-    end
-
-    after(:each) do
-      # in case one of the tests that removes directory ready permissions fails...
-      FileUtils.chmod_R('u=rwx', @tmpdir)
-
-      FileUtils.remove_entry_secure(@tmpdir)
-    end
-
-    describe 'delete' do
-      it 'should return :result=true when the key file does not exist' do
-        expect( @plugin.delete('does/not/exist/key')[:result] ).to be true
-        expect( @plugin.delete('does/not/exist/key')[:err_msg] ).to be_nil
-      end
-
-      it 'should return :result=true when the key file can be deleted' do
-        key_file = File.join(@root_path, 'key1')
-        FileUtils.touch(key_file)
-        expect( @plugin.delete('key1')[:result] ).to be true
-        expect( @plugin.delete('key1')[:err_msg] ).to be_nil
-        expect( File.exist?(key_file) ).to be false
-      end
-
-      it 'should return :result=false and an :err_msg when the key file delete fails' do
-        # make a key file that is inaccessible
-        key_file = File.join(@root_path, 'production/key1')
-        FileUtils.mkdir_p(File.dirname(key_file))
-        FileUtils.touch(key_file)
-        FileUtils.chmod(0400, File.dirname(key_file))
-        result = @plugin.delete('production/key1')
+      it 'should return a failed result when plugin instance cannot be created' do
+        result = @adapter.delete(key, @options_failer_ctr)
         expect( result[:result] ).to be false
-        expect( result[:err_msg] ).to match(/Delete failed:/)
-        FileUtils.chmod(0770, File.dirname(key_file))
-        expect( File.exist?(key_file) ).to be true
-      end
-    end
-
-    describe 'deletetree' do
-      it 'should return :result=true when the key folder does not exist' do
-        expect( @plugin.deletetree('does/not/exist/folder')[:result] ).to be true
-        expect( @plugin.deletetree('does/not/exist/folder')[:err_msg] ).to be_nil
+        expect( result[:err_msg] ).to match(/libkv Error: Unable to construct 'failer\/test'/)
       end
 
-      it 'should return :result=true when the key folder can be deleted' do
-        key_dir = File.join(@root_path, 'production')
-        FileUtils.mkdir_p(key_dir)
-        FileUtils.touch(File.join(key_dir, 'key1'))
-        FileUtils.touch(File.join(key_dir, 'key2'))
-        expect( @plugin.deletetree('production')[:result] ).to be true
-        expect( @plugin.deletetree('production')[:err_msg] ).to be_nil
-        expect( Dir.exist?(key_dir) ).to be false
-      end
-
-      it 'should return :result=false and an :err_msg when the key folder delete fails' do
-        # make a key file that is inaccessible so that recursive delete fails
-        key_dir = File.join(@root_path, 'production/gen_passwd')
-        FileUtils.mkdir_p(key_dir)
-        key_file = File.join(key_dir, 'key1')
-        FileUtils.touch(key_file)
-        FileUtils.chmod(0400, File.dirname(key_file))
-        result = @plugin.deletetree('production/gen_passwd')
+      it 'should fail when plugin delete raises an exception' do
+        result = @adapter.delete(key, @options_failer)
         expect( result[:result] ).to be false
-        expect( result[:err_msg] ).to match(/Folder delete failed:/)
-        FileUtils.chmod(0770, File.dirname(key_file))
-        expect( Dir.exist?(key_dir) ).to be true
+        expect( result[:err_msg] ).to match(/libkv failer\/test Error: delete catastrophic failure/)
       end
     end
 
-    describe 'exists' do
-      it 'should return :result=false when the key file does not exist' do
-        result = @plugin.exists('does/not/exist/key')
+    context '#deletetree' do
+      let(:keydir) { key.gsub('/key','') }
+      it 'should return plugin deletetree result' do
+        @plugin.put(key_plus_env, serialized_value)
+        expect(@adapter.deletetree(keydir, @options_file)).
+          to eq({:result => true, :err_msg => nil})
+
+        expect(@plugin.exists(key_plus_env)).
+          to eq({:result => false, :err_msg => nil})
+      end
+
+      it 'should return a failed result when plugin instance cannot be created' do
+        result = @adapter.deletetree(keydir, @options_failer_ctr)
         expect( result[:result] ).to be false
-        expect( result[:err_msg] ).to be_nil
+        expect( result[:err_msg] ).to match(/libkv Error: Unable to construct 'failer\/test'/)
       end
 
-      it 'should return :result=true when the key file exists and is accessible' do
-        key_file = File.join(@root_path, 'key1')
-        FileUtils.touch(key_file)
-        result = @plugin.exists('key1')
-        expect( result[:result] ).to be true
-        expect( result[:err_msg] ).to be_nil
-      end
-
-      it 'should return :result=false when the key file exists but is not accessible' do
-        # make a key file that is inaccessible
-        key_file = File.join(@root_path, 'production/key1')
-        FileUtils.mkdir_p(File.dirname(key_file))
-        FileUtils.touch(key_file)
-        FileUtils.chmod(0400, File.dirname(key_file))
-        result = @plugin.exists('production/key1')
+      it 'should fail when plugin deletetree raises an exception' do
+        result = @adapter.deletetree(keydir, @options_failer)
         expect( result[:result] ).to be false
-        expect( result[:err_msg] ).to be_nil
-        FileUtils.chmod(0770, File.dirname(key_file))
+        expect( result[:err_msg] ).to match(/libkv failer\/test Error: deletetree catastrophic failure/)
       end
     end
 
-    describe 'get' do
-      it 'should return set :result when the key file exists and is accessible' do
-        key_file = File.join(@root_path, 'key1')
-        value = 'value for key1'
-        File.open(key_file, 'w') { |file| file.write(value) }
-        result = @plugin.get('key1')
-        expect( result[:result] ).to eq value
-        expect( result[:err_msg] ).to be_nil
+    context '#exists' do
+      it 'should return plugin exists result' do
+        expect(@adapter.exists(key, @options_file)).
+          to eq({:result => false, :err_msg => nil})
       end
 
-      it 'should return an unset :result and an :err_msg when the key file does not exist' do
-        result = @plugin.get('does/not/exist/key')
-        expect( result[:result] ).to be_nil
-        expect( result[:err_msg] ).to match(/Key not found/)
+      it 'should return a failed result when plugin instance cannot be created' do
+        result = @adapter.exists(key, @options_failer_ctr)
+        expect( result[:result] ).to be nil
+        expect( result[:err_msg] ).to match(/libkv Error: Unable to construct 'failer\/test'/)
       end
 
-      it 'should return an unset :result and an :err_msg when times out waiting for key lock' do
-        key = 'key1'
-        value = 'value for key1'
-        locked_key_file_operation(@root_path, key, value) do
-          puts "     >> Executing plugin get() for '#{key}'"
-          result = @plugin.get(key)
-          expect( result[:result] ).to be_nil
-          expect( result[:err_msg] ).to match /Timed out waiting for key file lock/
-        end
-
-        # just to be sure lock is appropriately cleared...
-        result = @plugin.get(key)
-        expect( result[:result] ).to_not be_nil
-        expect( result[:err_msg] ).to be_nil
-      end
-
-      it 'should return an unset :result and an :err_msg when the key file exists but is not accessible' do
-        # make a key file that is inaccessible
-        key_file = File.join(@root_path, 'production/key1')
-        FileUtils.mkdir_p(File.dirname(key_file))
-        File.open(key_file, 'w') { |file| file.write('value for key1') }
-        FileUtils.chmod(0400, File.dirname(key_file))
-        result = @plugin.get('production/key1')
-        expect( result[:result] ).to be_nil
-        expect( result[:err_msg] ).to match(/Key retrieval failed/)
-        FileUtils.chmod(0770, File.dirname(key_file))
+      it 'should fail when plugin exists raises an exception' do
+        result = @adapter.exists(key, @options_failer)
+        expect( result[:result] ).to be nil
+        expect( result[:err_msg] ).to match(/libkv failer\/test Error: exists catastrophic failure/)
       end
     end
 
-    # using plugin's put() in this test, because it is fully tested below
-    describe 'list' do
-
-      it 'should return an empty :result when key folder is empty' do
-        key_dir = File.join(@root_path, 'production')
-        FileUtils.mkdir_p(key_dir)
-        result = @plugin.list('production')
-        expect( result[:result] ).to eq({})
-        expect( result[:err_msg] ).to be_nil
+    context '#get' do
+      it 'should return deserialized plugin get result' do
+        @plugin.put(key_plus_env, serialized_value)
+        expect(@adapter.get(key, @options_file)).
+          to eq({
+            :result => {:value => value, :metadata => metadata},
+            :err_msg => nil
+          })
       end
 
-      it 'should return full list of key/value pairs in :result when key folder content is accessible' do
-        expected = {
-          'production/key1' => 'value for key1',
-          'production/key2' => 'value for key2',
-          'production/key3' => 'value for key3'
-        }
-        expected.each { |key,value| @plugin.put(key, value) }
-        result = @plugin.list('production')
-        expect( result[:result] ).to eq(expected)
-        expect( result[:err_msg] ).to be_nil
+      it 'should return a failed result when deserialization of plugin get result fails' do
+        @plugin.put(key_plus_env, 'This is not JSON')
+        result = @adapter.get(key, @options_file)
+        expect( result.fetch(:result) ).to be_nil
+        expect( result[:err_msg] ).to match(/libkv file\/test Error: Failed to deserialize/)
       end
 
-      it 'should return partial list of key/value pairs in :result when some key folder content is not accessible' do
-        expected = {
-          'production/key1' => 'value for key1',
-          'production/key3' => 'value for key3'
-        }
-        expected.each { |key,value| @plugin.put(key, value) }
-
-        # create a file for 'production/key2', but make it inaccessible via a lock
-        locked_key_file_operation(@root_path, 'production/key2', 'value for key2') do
-          puts "     >> Executing plugin list() for 'production'"
-          result = @plugin.list('production')
-          expect( result[:result] ).to eq(expected)
-          expect( result[:err_msg] ).to be_nil
-        end
-
+      it 'should return a failed result when plugin instance cannot be created' do
+        result = @adapter.get(key, @options_failer_ctr)
+        expect( result[:result] ).to be nil
+        expect( result[:err_msg] ).to match(/libkv Error: Unable to construct 'failer\/test'/)
       end
 
-      it 'should return an unset :result and an :err_msg when key folder exists but is not accessible' do
-        # create inaccessible key folder that has content
-        @plugin.put('production/gen_passwd/key1', 'value for key1')
-        FileUtils.chmod(0400, File.join(@root_path, 'production'))
-        result = @plugin.list('production/gen_passwd')
-        FileUtils.chmod(0770, File.join(@root_path, 'production'))
-        expect( result[:result] ).to be_nil
-        expect( result[:err_msg] ).to match(/Key folder not found/)
-      end
-
-      it 'should return an unset :result  and an :err_msg when key folder does not exist' do
-        result = @plugin.list('production')
-        expect( result[:result] ).to be_nil
-        expect( result[:err_msg] ).to match(/Key folder not found/)
+      it 'should fail when plugin get raises an exception' do
+        result = @adapter.get(key, @options_failer)
+        expect( result[:result] ).to be nil
+        expect( result[:err_msg] ).to match(/libkv failer\/test Error: get catastrophic failure/)
       end
     end
 
-    describe 'name' do
-      it 'should return configured name' do
-        expect( @plugin.name ).to eq 'file/test'
+    context '#list' do
+      let(:keydir) { key.gsub('/key','') }
+      it 'should return deserialized plugin list result' do
+        @plugin.put(key_plus_env, serialized_value)
+        expect(@adapter.list(keydir, @options_file)).
+          to eq({
+            :result => {
+              key => {:value => value, :metadata => metadata},
+            },
+            :err_msg => nil
+          })
+      end
+
+      it 'should return a failed result when deserialization of plugin list result fails' do
+        @plugin.put(key_plus_env, 'This is not JSON')
+        result = @adapter.list(keydir, @options_file)
+        expect( result.fetch(:result) ).to be_nil
+        expect( result[:err_msg] ).to match(/libkv file\/test Error: Failed to deserialize/)
+      end
+
+      it 'should return a failed result when plugin instance cannot be created' do
+        result = @adapter.list(keydir, @options_failer_ctr)
+        expect( result[:result] ).to be nil
+        expect( result[:err_msg] ).to match(/libkv Error: Unable to construct 'failer\/test'/)
+      end
+
+      it 'should fail when plugin list raises an exception' do
+        result = @adapter.list(keydir, @options_failer)
+        expect( result[:result] ).to be nil
+        expect( result[:err_msg] ).to match(/libkv failer\/test Error: list catastrophic failure/)
       end
     end
 
-    # using plugin's get() in this test, because it has already been
-    # fully tested
-    describe 'put' do
-      it 'should return :result=true when the key file does not exist for a simple key' do
-        key = 'key1'
-        value = 'value for key1'
-        result = @plugin.put(key, value)
-        expect( result[:result] ).to be true
-        expect( result[:err_msg] ).to be_nil
-        expect( @plugin.get(key)[:result] ).to eq value
+    context '#put' do
+      it 'should return plugin put result' do
+        expect(@adapter.put(key, value, metadata, @options_file)).
+          to eq({:result => true, :err_msg => nil})
+
+        expect(@plugin.exists(key_plus_env)).
+          to eq({:result => true, :err_msg => nil})
       end
 
-      it 'should return :result=true when the key file does not exist for a complex key' do
-        key = 'production/gen_passwd/key1'
-        value = 'value for key1'
-        result = @plugin.put(key, value)
-        expect( result[:result] ).to be true
-        expect( result[:err_msg] ).to be_nil
-        expect( @plugin.get(key)[:result] ).to eq value
-      end
-
-      it 'should return :result=true when the key file exists and is accessible' do
-        key = 'key1'
-        value1 = 'value for key1 which is longer than second value'
-        value2 = 'second value for key1'
-        value3 = 'third value for key1 which is longer than second value'
-        @plugin.put(key, value1)
-
-        result = @plugin.put(key, value2)
-        expect( result[:result] ).to be true
-        expect( result[:err_msg] ).to be_nil
-        expect( @plugin.get(key)[:result] ).to eq value2
-
-        result = @plugin.put(key, value3)
-        expect( result[:result] ).to be true
-        expect( result[:err_msg] ).to be_nil
-        expect( @plugin.get(key)[:result] ).to eq value3
-      end
-
-      it 'should return :result=false and an :err_msg when times out waiting for key lock' do
-        key = 'key1'
-        value1 = 'first value for key1'
-        value2 = 'second value for key1'
-
-        locked_key_file_operation(@root_path, key, value1) do
-          puts "     >> Executing plugin.put() for '#{key}'"
-          result = @plugin.put(key, value2)
-          expect( result[:result] ).to be false
-          expect( result[:err_msg] ).to match /Timed out waiting for key file lock/
-        end
-
-        # just to be sure lock is appropriately cleared...
-        result = @plugin.put(key, value2)
-        expect( result[:result] ).to be true
-        expect( result[:err_msg] ).to be_nil
-      end
-
-      it 'should return :result=false an an :err_msg when the key file exists but is not accessible' do
-        # make a key file that is inaccessible
-        key = 'production/gen_passwd/key1'
-        value1 = 'first value for key1'
-        value2 = 'second value for key1'
-        @plugin.put(key, value1)
-        key_parent_dir = File.join(@root_path, 'production', 'gen_passwd')
-        FileUtils.chmod(0400, key_parent_dir)
-
-        result = @plugin.put(key, value2)
+      it 'should return a failed result when plugin instance cannot be created' do
+        result = @adapter.put(key, value, metadata, @options_failer_ctr)
         expect( result[:result] ).to be false
-        expect( result[:err_msg] ).to match(/Key write failed/)
-        FileUtils.chmod(0770, key_parent_dir)
-        expect( @plugin.get(key)[:result] ).to eq value1
+        expect( result[:err_msg] ).to match(/libkv Error: Unable to construct 'failer\/test'/)
+      end
+
+      it 'should fail when plugin put raises an exception' do
+        result = @adapter.put(key, value, metadata, @options_failer)
+        expect( result[:result] ).to be false
+        expect( result[:err_msg] ).to match(/libkv failer\/test Error: put catastrophic failure/)
       end
     end
   end
-=end
 
 end
