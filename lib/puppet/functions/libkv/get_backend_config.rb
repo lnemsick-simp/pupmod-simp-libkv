@@ -11,22 +11,27 @@ Puppet::Functions.create_function(:'libkv::get_backend_config') do
   # @param backends List of backends for which plugins have been successfully
   #   loaded.
   #
+  # @param resource_info Resource string for the Puppet class or define that has
+  #   called the libkv function.
+  #
+  #   * Examples: 'Class[Myclass]' or 'Mydefine[name]'
+  #   * Used to determine the default backend to use, when none is specified
+  #     in the libkv options Hash
+  #
   # @return [Hash]] merged libkv options that will have the backend to use
   #   specified by 'backend'
   #
   # @raise [RuntimeError] if appropriate backend configuration cannot be found
   #
   dispatch :get_backend_config do
-    param 'Hash',  :options
-    param 'Array', :backends
+    param 'Hash',      :options
+    param 'Array',     :backends
+    param 'String[1]', :resource_info
   end
 
-  def get_backend_config(options, backends)
+  def get_backend_config(options, backends, resource_info)
     merged_options = merge_options(options)
     call_function('libkv::validate_options', merged_options, backends)
-
-    # Return the full set of options (not just the specific backend options),
-    # so that any global options are also available
     return merged_options
   end
 
