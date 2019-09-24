@@ -22,6 +22,16 @@ Puppet::Functions.create_function(:'libkv::get_backend_config') do
   end
 
   def get_backend_config(options, backends)
+    merged_options = merge_options(options)
+    call_function('libkv::validate_options', merged_options, backends)
+
+    # Return the full set of options (not just the specific backend options),
+    # so that any global options are also available
+    return merged_options
+  end
+
+  # merge options and set defaults for 'environment' and 'backend' when missing
+  def merge_options(options)
     merged_options = call_function('lookup', 'libkv::options', { 'default_value' => {} })
     merged_options.deep_merge!(options)
 
@@ -35,27 +45,11 @@ Puppet::Functions.create_function(:'libkv::get_backend_config') do
       merged_options['backend'] = backend
     end
 
-    unless (merged_options.has_key?('backends') &&
-        merged_options['backends'].is_a?(Hash) &&
-        merged_options['backends'].has_key?(backend) &&
-        merged_options['backends'][backend].has_key?('id') &&
-        merged_options['backends'][backend].has_key?('type'))
-      raise("No backend #{backend} with 'id' and 'type' attributes has been configured")
-    elsif
-      !backends.include?(merged_options['backends'][backend]['type'])
-      raise("Backend plugin '#{merged_options['backends'][backend]['type']}' not available")
-    else
-      #FIXME Do we want to make sure all backends have unique 'id' + 'type' here?
-      # Where else would we do the validation?  Perhaps in libkv::add_libkv?
-    end
-
     unless merged_options.has_key?('environment')
       merged_options['environment'] = closure_scope.compiler.environment.to_s
     end
 
     merged_options['environment'] = '' if merged_options['environment'].nil?
-
-    # Return the full set of options (not just the specific backend options),
-    # so that any global options are also available
-    return merged_options
   end
+end
+
