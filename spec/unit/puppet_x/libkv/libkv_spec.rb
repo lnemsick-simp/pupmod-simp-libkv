@@ -219,57 +219,67 @@ describe 'libkv adapter anonymous class' do
       'baz' => 42
     } }
 
-    binary_file1_content = IO.read(
-      File.join('..', '..', '..', 'support', 'binary_data', 'test_krb5.keytab')
-    ).force_encoding('ASCII-8BIT')
 
-    binary_file2_content = IO.read(
-      File.join('..', '..', '..', 'support', 'binary_data', 'random')
-    ).force_encoding('ASCII-8BIT')
+    data_dir = File.join(File.dirname(__FILE__), '..', '..', '..', 'support',
+      'binary_data')
+
+    binary_file1_content = IO.read(File.join(data_dir, 'test_krb5.keytab')
+      ).force_encoding('ASCII-8BIT')
+
+    binary_file2_content = IO.read(File.join(data_dir, 'random')
+      ).force_encoding('ASCII-8BIT')
 
     testvalues = {
       'Boolean' => {
         :value            =>true,
-        :serialized_value => "{'value':true,'foo':'bar','baz':42}"
+        :serialized_value => '{"value":true,"metadata":{"foo":"bar","baz":42}}'
       },
-      'String valid UTF-8' =>  {
-        :value => 'some string',
-        :serialized_value => "{'value':'valid UTF-8','foo':'bar','baz':42}"
+      'valid UTF-8 String' =>  {
+        :value            => 'some string',
+        :serialized_value => '{"value":"some string","metadata":{"foo":"bar","baz":42}}'
       },
-      'String malformed UTF-8' => {
+      'malformed UTF-8 String' => {
         :value            => binary_file1_content.dup.force_encoding('UTF-8'),
         :serialized_value =>
-          "{'value':'valid UTF-8'," +
-          "'foo':'bar','baz':42}"
+          '{"value":"' + Base64.strict_encode64(binary_file1_content) + '",' +
+          '"encoding":"base64",' +
+          '"original_encoding":"ASCII-8BIT",' +
+          '"metadata":{"foo":"bar","baz":42}}',
+        # only difference is encoding: deserialized value will have the
+        # correct encoding of ASCII-8BIT
+        :deserialized_value =>  binary_file1_content
       },
-      'String ASCII-8BIT' => {
+      'ASCII-8BIT String' => {
         :value            => binary_file2_content,
         :serialized_value =>
-          "{'value':'valid UTF-8'," +
-          "'foo':'bar','baz':42}"
+          '{"value":"' + Base64.strict_encode64(binary_file2_content) + '",' +
+          '"encoding":"base64",' +
+          '"original_encoding":"ASCII-8BIT",' +
+          '"metadata":{"foo":"bar","baz":42}}'
       },
       'Integer' => {
         :value            => 255,
-        :serialized_value =>  "{'value':255,'foo':'bar','baz':42}"
+        :serialized_value =>  '{"value":255,"metadata":{"foo":"bar","baz":42}}'
       },
       'Float' => {
-        :value            => 2.38490,
-        :serialized_value => "{'value':2.38490,'foo':'bar','baz':42}"
+        :value            => 2.3849,
+        :serialized_value => '{"value":2.3849,"metadata":{"foo":"bar","baz":42}}'
       },
       'Array of valid UTF-8 strings' => {
         :value            => [ 'valid UTF-8 1', 'valid UTF-8 2'],
         :serialized_value =>
-          "{'value':'valid UTF-8'," +
-          "'foo':'bar','baz':42}"
+          '{"value":["valid UTF-8 1","valid UTF-8 2"],' +
+          '"metadata":{"foo":"bar","baz":42}}'
       },
-=begin
-can't handle this correctly yet
-      'Array of invalid UTF-8 strings' => {
-        :value            => [ binary_file2_content ],
-        :serialized_value =>  TBD
+      'Array of binary strings' => {
+        :skip             => 'Not yet supported',
+        :value            => [
+           binary_file1_content.dup.force_encoding('UTF-8'),
+           binary_file2_content
+        ],
+        :serialized_value => 'TBD'
       },
-=end
-      'Hash' => {
+      'Hash with valid UTF-8 strings' => {
         :value => {
           'key1' => 'test_string',
           'key2' => 1000,
@@ -277,14 +287,31 @@ can't handle this correctly yet
           'key4' => { 'nestedkey1' => 'nested_test_string' }
         },
         :serialized_value =>
-          "{'value':'valid UTF-8'," +
-          "'foo':'bar','baz':42}"
+          '{"value":' +
+          '{' +
+          '"key1":"test_string",' +
+          '"key2":1000,' +
+          '"key3":false,' +
+          '"key4":{"nestedkey1":"nested_test_string"}' +
+          '},' +
+          '"metadata":{"foo":"bar","baz":42}}'
+      },
+      'Hash with binary strings' => {
+        :skip             => 'Not yet supported',
+        :value => {
+          'key1' => binary_file1_content.dup.force_encoding('UTF-8'),
+          'key2' => 1000,
+          'key3' => false,
+          'key4' => { 'nestedkey1' => binary_file2_content }
+        },
+        :serialized_value => 'TBD'
       }
     }
 
     context '#serialize and #serialize_string_value' do
       testvalues.each do |summary,info|
-        it "should properly serialize #{summary}" do
+        it "should properly serialize a #{summary}" do
+          skip info[:skip] if info.has_key?(:skip)
           expect( @adapter.serialize(info[:value], metadata) ).
             to eq info[:serialized_value]
         end
@@ -292,6 +319,34 @@ can't handle this correctly yet
     end
 
     context '#deserialize and #deserialize_string_value' do
+      testvalues.each do |summary,info|
+        it "should properly deserialize a #{summary}" do
+          skip info[:skip] if info.has_key?(:skip)
+          expected = info.has_key?(:deserialized_value) ? info[:deserialized_value] : info[:value]
+          expect( @adapter.deserialize(info[:serialized_value]) ).
+            to eq({ :value => expected, :metadata => metadata })
+        end
+      end
+
+      it 'should fail when input is not in JSON format' do
+        expect{ @adapter.deserialize('this is not JSON')}. to raise_error(
+          JSON::ParserError)
+      end
+
+      it "should fail when input does not have 'value' key" do
+        expect{ @adapter.deserialize('{"Value":255}')}. to raise_error(
+          RuntimeError, /Failed to deserialize: 'value' missing/)
+      end
+
+      it "should fail when input has unsupported 'encoding' key" do
+        serialized_value = '{"value":"some value","encoding":"oops",' +
+          '"original_encoding":"ASCII-8BIT"}'
+        expect{ @adapter.deserialize(serialized_value)}. to raise_error(
+          RuntimeError, /Failed to deserialize: Unsupported encoding/)
+      end
+    end
+
+    context '#serialize and #deserialize' do
     end
   end
 

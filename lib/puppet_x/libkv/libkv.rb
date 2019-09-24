@@ -365,12 +365,23 @@ simp_libkv_adapter_class = Class.new do
     plugin_instances[name]
   end
 
+  # Deserializes JSON to a Hash containing :value and :metadata keys
+  #
+  # See limitations of #serialize() below
+  #
+  # @return Hash containing :value and :metadata keys
+  # @raise JSON::ParserError if the serialized_value does not
+  #   contain valid JSON
+  # @raise RuntimeError if the Hash representation of serialized_value does
+  # not contain a 'value' key or the optional 'encoding' key contains an
+  # unsupported encoding scheme.
+  #
   #FIXME This should use Puppet's deserialization code so that
   # all contained Binary strings in the value object are properly deserialized
   def deserialize(serialized_value)
     encapsulation = JSON.parse(serialized_value)
     unless encapsulation.has_key?('value')
-      raise("Failed to deserialized: Value missing in '#{serialized_value}'")
+      raise("Failed to deserialize: 'value' missing in '#{serialized_value}'")
     end
 
     result = {}
@@ -385,6 +396,7 @@ simp_libkv_adapter_class = Class.new do
     result
   end
 
+  # @raise RuntimeError if the optional 'encoding' specifie dis not 'base64'
   def deserialize_string_value(encapsulation)
     value = encapsulation['value']
     if encapsulation.has_key?('encoding')
@@ -395,31 +407,57 @@ simp_libkv_adapter_class = Class.new do
           value.force_encoding(encapsulation['original_encoding'])
         end
       else
-        raise("Failed to deserialized: Unsupported encoding in '#{encapsulation}'")
+        raise("Failed to deserialize: Unsupported encoding in '#{encapsulation}'")
       end
     end
 
     value
   end
 
-  #FIXME This should use Puppet's serialization code so that
-  # all contained Binary strings in the value object are properly serialized
+  # Serializes objects to JSON
+  #
+  # @param value The value for a key
+  # @param metadata The metadata Hash for the key
+  #
+  # @return JSON representation of the value and metadata
+  # @raise 
+  #
+  # This is a **LIMITED** implementation meant for prototyping the libkv API.
+  # *  It can only handle objects that have a meaningful to_json method.
+  #    Ruby primitives (String, Integer, Float, Boolean) and Arrays and Hashes
+  #    containing them are OK. Custom classes that use the default Object to_json
+  #    (i.e., the one that simply prints out the class name and object ID such as
+  #    "#<MyTest:0x0000000000e9b6f0>") will not be OK.
+  # *  It can only handle binary String data in the value when the value is a
+  #    String object.  All other cases (e.g., binary Strings within a Hash or
+  #    Array value, binary Strings within the metadata Hash) will fail
+  #    serialization unless that binary data just happens to form valid UTF-8.
+  #
+  #FIXME This should use Puppet's serialization code so that all contained Binary
+  # strings are properly serialized
   def serialize(value, metadata)
+    encapsulation = nil
     if value.is_a?(String)
-      enscapsulation = serialize_string_value(value, metadata)
+      encapsulation = serialize_string_value(value, metadata)
     else
       encapsulation = { 'value' => value, 'metadata' => metadata }
     end
+    # This will raise an error if the value or metadata contains
+    # any element that cannot be serialized to JSON.  Caller catches
+    # error and reports failure.
     encapsulation.to_json
   end
 
   def serialize_string_value(value, metadata)
     normalized_value = value.dup
-    if (normalized_value.encoding == 'UTF-8') && !normalized_value.valid_encoding?
+    if (normalized_value.encoding == Encoding::UTF_8) &&
+       !normalized_value.valid_encoding?
+      # this was a user error...on decoding, the encoding error will be fixed
       normalized_value.force_encoding('ASCII-8BIT')
     end
 
-    if normalized_value.encoding == 'ASCII-8BIT'
+    encapsulation = nil
+    if normalized_value.encoding == Encoding::ASCII_8BIT
       encoded_value = Base64.strict_encode64(normalized_value)
       encapsulation = {
         'value' => encoded_value,
@@ -428,7 +466,7 @@ simp_libkv_adapter_class = Class.new do
         'metadata' => metadata
       }
     else
-      encapsulation = { 'value' => value, 'metadata' => metadata }
+      encapsulation = { 'value' => normalized_value, 'metadata' => metadata }
     end
     encapsulation
   end
