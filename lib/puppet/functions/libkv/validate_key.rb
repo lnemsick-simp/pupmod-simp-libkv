@@ -6,7 +6,6 @@
 #     * A-Z
 #     * 0-9
 #     * The following special characters: `._:-/`
-#   * Key must start with '/'
 #   * Key may not contain '/./' or '/../' sequences.
 # * Terminates catalog compilation if validation fails.
 #
@@ -33,15 +32,21 @@ Puppet::Functions.create_function(:'libkv::validate_key') do
   end
 
   def validate_key(key)
-    char_regex = /^([a-zA-Z0-9._:\-\/])+$/
+    ws_regex = /[[:space:]]/
+    if (key =~ ws_regex)
+      msg = "key '#{key}' contains disallowed whitespace"
+      raise(msg)
+    end
+
+    char_regex = /^[a-zA-Z0-9._:\-\/]+$/m
     unless (key =~ char_regex)
-      msg = "key '#{name}' contains unsupported characters.  Allowed set=[a-zA-Z0-9._:-/]"
+      msg = "key '#{key}' contains unsupported characters.  Allowed set=[a-zA-Z0-9._:-/]"
       raise(msg)
     end
 
     dot_regex = /\/\.\.?\//
     if (key =~ dot_regex)
-      msg = "key '#{name}' contains disallowed '/./' or '/../' sequence"
+      msg = "key '#{key}' contains disallowed '/./' or '/../' sequence"
       raise(msg)
     end
   end
