@@ -33,9 +33,7 @@ Puppet::Functions.create_function(:'libkv::delete') do
   #         type can be configured differently).
   #       * `type`:  Backend type.
   #
-  # @raise [ArgumentError] If the key is invalid, the requested backend does
-  #   not exist in `libkv::options`, or the plugin for the requested backend
-  #   is not available.
+  # @raise [ArgumentError] If the key or merged backend config is invalid
   #
   # @raise [LoadError] If the libkv adapter cannot be loaded
   #
@@ -63,7 +61,7 @@ Puppet::Functions.create_function(:'libkv::delete') do
     begin
       merged_options = call_function( 'libkv::get_backend_config',
         backend_options, catalog.libkv.backends)
-    rescue RuntimeError => e
+    rescue ArgumentError => e
       msg = "libkv Configuration Error for libkv::delete with key=#{key}: #{e.message}"
       raise ArgumentError.new(msg)
     end

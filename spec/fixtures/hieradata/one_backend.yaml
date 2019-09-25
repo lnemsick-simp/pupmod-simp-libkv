@@ -1,0 +1,19 @@
+---
+libkv::options:
+  # global options
+  environment: "myenv"
+  softfail: false
+
+  # we only have one backend, so set it explicitly
+  backend: default
+
+  # Hash of backend configurations containing single entry
+  backends:
+    default:
+      type: file
+      id: file
+
+      # plugin-specific configuration
+      root_path: "/var/simp/libkv/file"
+      lock_timeout_seconds: 30
+

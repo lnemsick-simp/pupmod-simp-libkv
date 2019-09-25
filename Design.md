@@ -446,14 +446,14 @@ conform to the following conventions:
     `<Define type>[<instance>]` portion of the name is how the defined
     resource is represented in the Puppet catalog.  For example, for the
     `first` instance of the `mydefine` defined type, the appropriate
-    backend name will be `default.Mydefine[First]`.
+    backend name will be `default.Myclass::Mydefine[first]`.
 
   * `default.<Define type>` specifies the default backend configuration
     for all instances of a defined type.  The `<Define type>` portion
     of the name is the first part of how a specific defined resource is
     represented in the Puppet catalog.  For example, for all instances
     of a `mydefine` Define, the appropriate backend name will be
-    `default.Mydefine`.
+    `default.Myclass::Mydefine`.
 
   * `default` specifies the default backend configuration when no
     other `default.xxx` configuration matches the name of the resource
@@ -558,16 +558,16 @@ configuration defaults is specified.
     #    a `backend` key in its backend options hash.
     backends:
       # pki Class resource
-      "default.Class[Pki]":           "%{alias('libkv::backend::consul')}"
+      "default.Class[Pki]":                     "%{alias('libkv::backend::consul')}"
 
-      # specific 'myinstance' mydefine Define resource
-      "default.Mydefine[Myinstance]": "%{alias('libkv::backend::consul')}"
+      # specific instance of mymodule::mydefine defined type
+      "default.Mymodule::Mydefine[Myinstance]": "%{alias('libkv::backend::consul')}"
 
-      # all other (not fully specified) mydefine Define resources
-      "default.Mydefine":             "%{alias('libkv::backend::alt_file')}"
+      # all mymodule::mydefine instances not matching a specific instance default
+      "default.Mymodule::Mydefine":             "%{alias('libkv::backend::alt_file')}"
 
       # all other resources
-      "default":                       "%{alias('libkv::backend::file')}"
+      "default":                                "%{alias('libkv::backend::file')}"
 
 
 ```

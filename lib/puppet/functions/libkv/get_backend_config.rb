@@ -1,5 +1,5 @@
-# Determine backend configuration using the options parameter,
-# `libkv::options` Hiera, and the list of supported backends.
+# Merge and validate backend configuration using the options parameter,
+# `libkv::options` Hiera, and global libkv defaults
 #
 # @author https://github.com/simp/pupmod-simp-libkv/graphs/contributors
 #
@@ -14,14 +14,16 @@ Puppet::Functions.create_function(:'libkv::get_backend_config') do
   # @param resource_info Resource string for the Puppet class or define that has
   #   called the libkv function.
   #
-  #   * Examples: 'Class[Myclass]' or 'Mydefine[name]'
+  #   * Examples: 'Class[Myclass]' or 'Mymodule::Mydefine[myinstance]'
   #   * Used to determine the default backend to use, when none is specified
   #     in the libkv options Hash
   #
   # @return [Hash]] merged libkv options that will have the backend to use
   #   specified by 'backend'
   #
-  # @raise [RuntimeError] if appropriate backend configuration cannot be found
+  # @raise [ArgumentError] if merged configuration fails validation
+  #
+  # @see libkv::validate_backend_config
   #
   dispatch :get_backend_config do
     param 'Hash',      :options
@@ -30,24 +32,43 @@ Puppet::Functions.create_function(:'libkv::get_backend_config') do
   end
 
   def get_backend_config(options, backends, resource_info)
-    merged_options = merge_options(options)
-    call_function('libkv::validate_options', merged_options, backends)
+    merged_options = merge_options(options, resource_info)
+    call_function('libkv::validate_backend_config', merged_options, backends)
     return merged_options
   end
 
-  # merge options and set defaults for 'environment' and 'backend' when missing
-  def merge_options(options)
+  # merge options and set defaults for 'backend', 'environment', and 'softfail'
+  # when missing
+  def merge_options(options, resource_info)
+    require 'deep_merge'
+    # deep_merge will not work with frozen options, so make a deep copy
+    # (options.dup is a shallow copy of contained Hashes)
+    options_dup = Marshal.load(Marshal.dump(options))
+
     merged_options = call_function('lookup', 'libkv::options', { 'default_value' => {} })
-    merged_options.deep_merge!(options)
+    merged_options.deep_merge!(options_dup)
 
     backend = nil
     if merged_options.has_key?('backend')
       backend = merged_options['backend']
     else
-      #FIXME Need to look up calling class/define and then search for it
-      # in merged_options['backends']
       backend = 'default'
+      if merged_options.has_key?('backends')
+        defaults = merged_options['backends'].keys
+        defaults.delete_if { |name| !name.start_with?('default') }
+        full_default = "default.#{resource_info}"
+        partial_default = full_default.split('[').first
+        if defaults.include?(full_default)
+          backend = full_default
+        elsif defaults.include?(partial_default)
+          backend = partial_default
+        end
+      end
       merged_options['backend'] = backend
+    end
+
+    unless merged_options.has_key?('softfail')
+      merged_options['softfail'] = false
     end
 
     unless merged_options.has_key?('environment')
@@ -55,6 +76,7 @@ Puppet::Functions.create_function(:'libkv::get_backend_config') do
     end
 
     merged_options['environment'] = '' if merged_options['environment'].nil?
+    merged_options
   end
 end
 
