@@ -43,49 +43,49 @@ describe 'libkv::validate_backend_config' do
     it "should fail when options is missing 'backend'" do
       options = {}
       is_expected.to run.with_params(options, backends).
-        and_raise_error(RuntimeError,
+        and_raise_error(ArgumentError,
         /'backend' not specified in libkv configuration/)
     end
 
     it "should fail when options is missing 'backends'" do
       options = { 'backend' => 'file' }
       is_expected.to run.with_params(options, backends).
-        and_raise_error(RuntimeError,
+        and_raise_error(ArgumentError,
         /'backends' not specified in libkv configuration/)
     end
 
     it "should fail when 'backends' in not a Hash" do
       options = { 'backend' => 'file', 'backends' => [] }
       is_expected.to run.with_params(options, backends).
-        and_raise_error(RuntimeError,
+        and_raise_error(ArgumentError,
         /'backends' in libkv configuration is not a Hash/)
     end
 
     it "should fail when 'backends' does not have an entry for 'backend'" do
       options = { 'backend' => 'file', 'backends' => {} }
       is_expected.to run.with_params(options, backends).
-        and_raise_error(RuntimeError,
+        and_raise_error(ArgumentError,
         /No libkv backend 'file' with 'id' and 'type' attributes has been configured/)
     end
 
     it "should fail when 'backends' entry for 'backend' is not a Hash" do
       options = { 'backend' => 'file', 'backends' => { 'file' => [] } }
       is_expected.to run.with_params(options, backends).
-        and_raise_error(RuntimeError,
+        and_raise_error(ArgumentError,
         /No libkv backend 'file' with 'id' and 'type' attributes has been configured/)
     end
 
     it "should fail when 'backends' entry for 'backend' is missing 'id'" do
       options = { 'backend' => 'file', 'backends' => { 'file' => {} } }
       is_expected.to run.with_params(options, backends).
-        and_raise_error(RuntimeError,
+        and_raise_error(ArgumentError,
         /No libkv backend 'file' with 'id' and 'type' attributes has been configured/)
     end
 
     it "should fail when 'backends' entry for 'backend' is missing 'type'" do
       options = { 'backend' => 'file', 'backends' => { 'file' => { 'id' => 'test'} } }
       is_expected.to run.with_params(options, backends).
-        and_raise_error(RuntimeError,
+        and_raise_error(ArgumentError,
         /No libkv backend 'file' with 'id' and 'type' attributes has been configured/)
     end
 
@@ -95,7 +95,7 @@ describe 'libkv::validate_backend_config' do
         'backends' => { 'file' => { 'id' => 'test', 'type' => 'file'} }
       }
       is_expected.to run.with_params(options, [ 'consul' ]).
-        and_raise_error(RuntimeError,
+        and_raise_error(ArgumentError,
         /libkv backend plugin 'file' not available/)
     end
 
@@ -110,7 +110,7 @@ describe 'libkv::validate_backend_config' do
          }
       }
       is_expected.to run.with_params(options, backends).
-        and_raise_error(RuntimeError,
+        and_raise_error(ArgumentError,
         /libkv config contains different backend configs for type=file id=test/)
     end
 

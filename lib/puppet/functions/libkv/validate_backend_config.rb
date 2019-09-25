@@ -9,7 +9,7 @@ Puppet::Functions.create_function(:'libkv::validate_backend_config') do
   # @param backends List of backends for which plugins have been successfully
   #   loaded.
   #
-  # @raise [RuntimeError] if a backend has not been specified, appropriate
+  # @raise [ArgumentError] if a backend has not been specified, appropriate
   #   configuration for a specified backend cannot be found, or different
   #   backend configurations are provided for the same ['type', 'id'] pair.
   #
@@ -22,17 +22,20 @@ Puppet::Functions.create_function(:'libkv::validate_backend_config') do
 
   def validate_backend_config(options, backends)
     unless options.has_key?('backend')
-      raise("'backend' not specified in libkv configuration: #{options}")
+      msg = "'backend' not specified in libkv configuration: #{options}"
+      raise ArgumentError.new(msg)
     end
 
     backend = options['backend']
 
     unless options.has_key?('backends')
-      raise("'backends' not specified in libkv configuration: #{options}")
+      msg = "'backends' not specified in libkv configuration: #{options}"
+      raise ArgumentError.new(msg)
     end
 
     unless options['backends'].is_a?(Hash)
-      raise("'backends' in libkv configuration is not a Hash: #{options}")
+      msg = "'backends' in libkv configuration is not a Hash: #{options}"
+      raise ArgumentError.new(msg)
     end
 
     unless (
@@ -41,11 +44,13 @@ Puppet::Functions.create_function(:'libkv::validate_backend_config') do
       options['backends'][backend].has_key?('id') &&
       options['backends'][backend].has_key?('type')
     )
-      raise("No libkv backend '#{backend}' with 'id' and 'type' attributes has been configured: #{options}")
+      msg = "No libkv backend '#{backend}' with 'id' and 'type' attributes has been configured: #{options}"
+      raise ArgumentError.new(msg)
     end
 
     unless backends.include?(options['backends'][backend]['type'])
-      raise("libkv backend plugin '#{options['backends'][backend]['type']}' not available. Valid plugins = #{backends}")
+      msg = "libkv backend plugin '#{options['backends'][backend]['type']}' not available. Valid plugins = #{backends}"
+      raise ArgumentError.new(msg)
     end
 
     # plugin instances are uniquely defined by the <type,id> pair, not name.
@@ -58,7 +63,7 @@ Puppet::Functions.create_function(:'libkv::validate_backend_config') do
         unless backend_instances[instance_id] == config
           msg = 'libkv config contains different backend configs for ' +
             "type=#{config['type']} id=#{config['id']}: #{options}"
-          raise(msg)
+          raise ArgumentError.new(msg)
         end
       else
         backend_instances[instance_id] = config
