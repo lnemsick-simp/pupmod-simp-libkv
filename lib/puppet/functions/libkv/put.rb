@@ -29,13 +29,12 @@ Puppet::Functions.create_function(:'libkv::put') do
   #   * `backends`: Hash.  Hash of backend configuration in which the
   #     key is the name of an instance of a backend.
   #
-  #     * Merged hash must have backend configuration for a 'default' key.
   #     * Each backend configuration must be a Hash with the following
   #       required keys:
   #
   #       * `id`:  Unique name for the instance of the backend. (Same backend
   #         type can be configured differently).
-  #       * `type`:  Backend type.  Returned value of `<plugin class>.name()`.
+  #       * `type`:  Backend type.
   #
   # @raise [ArgumentError] If the key is invalid, the requested backend does
   #   not exist in `libkv::options`, or the plugin for the requested backend

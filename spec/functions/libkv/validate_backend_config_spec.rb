@@ -15,6 +15,11 @@ describe 'libkv::validate_backend_config' do
             'id'        => 'test',
             'type'      => 'file'
           },
+          # this duplicate is OK because its config exactly matches test_file
+          'test_file_dup'  => {
+            'id'        => 'test',
+            'type'      => 'file'
+          },
           'another_file' => {
             'id'        => 'another_test',
             'type'      => 'file'
@@ -94,17 +99,19 @@ describe 'libkv::validate_backend_config' do
         /libkv backend plugin 'file' not available/)
     end
 
-    it "should fail when 'backends' does not specify unique plugin instances" do
+    it "should fail when 'backends' contains conflicting configs for the same plugin instance" do
       options = {
         'backend'  => 'file1',
         'backends' => {
           'file1'     => { 'id' => 'test', 'type' => 'file'},
-          'file1_dup' => { 'id' => 'test', 'type' => 'file', 'foo' => 'bar'}
+
+          # this should have a different id because it has different config
+          'file2'     => { 'id' => 'test', 'type' => 'file', 'foo' => 'bar'}
          }
       }
       is_expected.to run.with_params(options, backends).
         and_raise_error(RuntimeError,
-        /libkv config contains multiple backend configs for type=file id=test/)
+        /libkv config contains different backend configs for type=file id=test/)
     end
 
   end
