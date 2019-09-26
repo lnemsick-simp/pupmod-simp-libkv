@@ -82,11 +82,12 @@ Puppet::Functions.create_function(:'libkv::put') do
     # determine backend configuration using options, `libkv::options`,
     # and the list of backends for which plugins have been loaded
     begin
-      calling_resource = call_function('simplib::debug::classtrace').last
+      calling_resource = call_function('simplib::debug::classtrace', false).last
+      catalog = closure_scope.find_global_scope.catalog
       merged_options = call_function( 'libkv::get_backend_config',
         options, catalog.libkv.backends, calling_resource)
     rescue ArgumentError => e
-      msg = "libkv Configuration Error for libkv::put with key=#{key}: #{e.message}"
+      msg = "libkv Configuration Error for libkv::put with key='#{key}': #{e.message}"
       raise ArgumentError.new(msg)
     end
 
