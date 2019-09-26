@@ -1,4 +1,6 @@
 module DataHelper
+  require 'base64'
+
   def data_dir
     File.join(File.dirname(__FILE__), 'support', 'binary_data')
   end

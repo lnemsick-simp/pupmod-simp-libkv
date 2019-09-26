@@ -26,7 +26,7 @@ describe 'libkv::put' do
           'root_path' => @root_path_test_file
         },
         'default'  => {
-          'id'        => 'test',
+          'id'        => 'default',
           'type'      => 'file',
           'root_path' => @root_path_default
         }
@@ -41,27 +41,83 @@ describe 'libkv::put' do
     FileUtils.remove_entry_secure(@tmpdir)
   end
 
+  # check basic operation without libkv::options specified and then basically
+  # verify options merging when libkv::options is called
   context 'without libkv::options' do
-    it 'should store key,value pair to a specific backend in options' do
+    let(:key) { 'mykey' }
+    let(:value) { 'myvalue' }
+    let(:metadata) { {
+      'foo' => 'bar',
+      'baz' => 42
+    } }
+
+    data_info.each do |summary,info|
+      it "should store key with #{summary} value + metadata to a specific backend in options" do
+        skip info[:skip] if info.has_key?(:skip)
+
+        is_expected.to run.with_params(key, info[:value] , metadata, @options_test_file).
+          and_return(true)
+
+        key_file = File.join(@root_path_test_file, 'production', key)
+        expect( File.exist?(key_file) ).to be true
+        expect( File.read(key_file) ).to eq(info[:serialized_value])
+      end
     end
 
-    it 'should store key,value pair to the default backend in options' do
-    end
+    it 'should store key,value,metadata tuple to the default backend in options' do
+      is_expected.to run.with_params(key, value , metadata, @options_default).
+        and_return(true)
 
-    it 'should store key,value,metadata tuple to the specified backend' do
+      key_file = File.join(@root_path_default, 'production', key)
+      expect( File.exist?(key_file) ).to be true
     end
 
     it 'should use environment-less key when environment is empty' do
+      options = @options_default.dup
+      options['environment'] = ''
+      is_expected.to run.with_params(key, value , metadata, options).
+        and_return(true)
+
+      env_key_file = File.join(@root_path_default, 'production', key)
+      expect( File.exist?(env_key_file) ).to be false
+
+      key_file = File.join(@root_path_default, key)
+      expect( File.exist?(key_file) ).to be true
     end
 
     it 'should fail when backend put fails and `softfail` is false' do
+      is_expected.to run.with_params(key, value , metadata, @options_failer).
+        and_raise_error(RuntimeError, /libkv Error for libkv::put with key='#{key}'/)
     end
 
-    it 'should return false when backend put fails and `softfail` is true' do
+    it 'should log warning and return false when backend put fails and `softfail` is true' do
+      options = @options_failer.dup
+      options['softfail'] = true
+
+      is_expected.to run.with_params(key, value , metadata, options).
+        and_return(false)
+
+      #FIXME check warning log
     end
   end
 
   context 'with libkv::options' do
+    let(:hieradata) { 'multiple_backends_missing_default' }
+
+    it 'should merge libkv::options' do
+      # @options_default will add the missing default backend config and
+      # override the environment setting.  To spot check options merge (which
+      # is fully tested elsewhere), remove the environment setting and verify
+      # we use the default config from the local options Hash and the
+      # environment from libkv::options
+      options = @options_default.dup
+      options.delete('environment')
+      is_expected.to run.with_params('key', 'value', {}, options).
+        and_return(true)
+
+      key_file = File.join(@root_path_default, 'myenv', 'key')
+      expect( File.exist?(key_file) ).to be true
+    end
   end
 
   context 'other error cases' do

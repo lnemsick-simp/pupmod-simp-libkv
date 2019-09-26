@@ -95,7 +95,7 @@ Puppet::Functions.create_function(:'libkv::put') do
     backend_result = catalog.libkv.put(key, value, metadata, merged_options)
     success = backend_result[:result]
     unless success
-      err_msg =  "libkv::put with key=#{key}: #{backend_result[:err_msg]}"
+      err_msg =  "libkv Error for libkv::put with key='#{key}': #{backend_result[:err_msg]}"
       if merged_options['softfail']
         Puppet.warning(err_msg)
       else
