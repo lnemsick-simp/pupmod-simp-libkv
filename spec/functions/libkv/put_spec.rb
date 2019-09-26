@@ -41,8 +41,9 @@ describe 'libkv::put' do
     FileUtils.remove_entry_secure(@tmpdir)
   end
 
-  # check basic operation without libkv::options specified and then basically
-  # verify options merging when libkv::options is called
+  # The tests will verify most of the function behavior without libkv::options
+  # specified and then verify options merging when libkv::options is specified.
+
   context 'without libkv::options' do
     let(:key) { 'mykey' }
     let(:value) { 'myvalue' }

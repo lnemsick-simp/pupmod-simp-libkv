@@ -1,152 +1,147 @@
-#!/usr/bin/env ruby -S rspec
-# vim: set expandtab ts=2 sw=2:
 require 'spec_helper'
 
-valid_characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890/_-+'
-invalid_characters = ";':,./<>?[]\{}|=`~!@#$%^&*()\""
-
 describe 'libkv::list' do
-  it 'should throw an exception with empty parameters' do
-    is_expected.to run.with_params({}).and_raise_error(Exception);
-  end
-  providers.each do |providerinfo|
-    provider = providerinfo["name"]
-    url = providerinfo["url"]
-    auth = providerinfo["auth"]
-    serialize = providerinfo["serialize"]
-    shared_params = {
-      "url" => url,
-      "auth" => auth,
-      "serialize" => serialize,
+
+# Going to use file plugin and the test plugins in spec/support/test_plugins
+# for these unit tests.
+  before(:each) do
+    # set up configuration for the file plugin
+    @tmpdir = Dir.mktmpdir
+    @root_path_test_file = File.join(@tmpdir, 'libkv', 'test_file')
+    @root_path_default   = File.join(@tmpdir, 'libkv', 'default')
+    options_base = {
+      'environment' => 'production',
+      'backends'    => {
+        # will use failer plugin for catastrophic error cases, because
+        # it is badly behaved and raises exceptions on all operations
+       'test_failer'  => {
+          'id'               => 'test',
+          'type'             => 'failer',
+          'fail_constructor' => false  # true = raise in constructor
+        },
+        # will use file plugin for non-catastrophic test cases
+        'test_file'  => {
+          'id'        => 'test',
+          'type'      => 'file',
+          'root_path' => @root_path_test_file
+        },
+        'default'  => {
+          'id'        => 'default',
+          'type'      => 'file',
+          'root_path' => @root_path_default
+        }
+      }
     }
-    context "when provider = #{provider}" do
-      context "when the key doesn't exist" do
-        it 'should return a hash' do
-          params = {
-            'key' => '/test9'
-          }.merge(shared_params)
-          result = subject.execute(params)
-          expect(result.class).to eql(Hash)
-        end
-        it 'should return an empty hash' do
-          params = {
-            'key' => '/test9'
-          }.merge(shared_params)
-          result = subject.execute(params)
-          expect(result).to eql({})
-        end
-      end
-      context "and when the key exists" do
-        def set_value(shared)
-          call_function("libkv::put", shared.merge({"value" => "value3"}))
-        end
-        it 'should return a hash' do
-          params = {
-            'key' => '/test10'
-          }.merge(shared_params)
-          set_value(params.merge({'key' => '/test10/test1', 'value' => 'value10'}))
-          set_value(params.merge({'key' => '/test10/test2', 'value' => 'value10'}))
-          result = subject.execute(params)
-          expect(result.class).to eql(Hash)
-        end
-        it 'should return a hash of strings' do
-          params = {
-            'key' => '/test10'
-          }.merge(shared_params)
-          set_value(params.merge({'key' => '/test10/test1', 'value' => 'value10'}))
-          set_value(params.merge({'key' => '/test10/test2', 'value' => 'value10'}))
-          result = subject.execute(params)
-          found_non_string = false
-          result.keys.each do |key|
-            if (key.class != String)
-              found_non_string = true
-            end
-          end
-          expect(found_non_string).to eql(false)
-        end
-        it 'when passed "fruits" it should return "apple" and "banana"' do
-          params = {
-            'key' => '/test11/fruits'
-          }.merge(shared_params)
+    @options_failer     = options_base.merge ({ 'backend' => 'test_failer' } )
+    @options_test_file  = options_base.merge ({ 'backend' => 'test_file' } )
+    @options_default    = options_base
+  end
 
-          set_value(params.merge({'key' => '/test11/fruits/apple', 'value' => 'value11'}))
-          set_value(params.merge({'key' => '/test11/fruits/banana', 'value' => 'value11'}))
-          set_value(params.merge({'key' => '/test11/meats/beef', 'value' => 'value11'}))
-          set_value(params.merge({'key' => '/test11/meats/pork', 'value' => 'value11'}))
+  after(:each) do
+    FileUtils.remove_entry_secure(@tmpdir)
+  end
 
-          result = subject.execute(params);
-          contains = result.key?("apple") and result.key?("banana");
-          expect(contains).to eql(true)
-        end
-        it 'when passed "meats" it should return "beef" and "pork"' do
-          params = {
-            'key' => '/test12/meats'
-          }.merge(shared_params)
+  # The tests will verify most of the function behavior without libkv::options
+  # specified and then verify options merging when libkv::options is specified.
 
-          set_value(params.merge({'key' => '/test12/fruits/apple', 'value' => 'value12'}))
-          set_value(params.merge({'key' => '/test12/fruits/banana', 'value' => 'value12'}))
-          set_value(params.merge({'key' => '/test12/meats/beef', 'value' => 'value12'}))
-          set_value(params.merge({'key' => '/test12/meats/pork', 'value' => 'value12'}))
+=begin
+  context 'without libkv::options' do
+    let(:key) { 'mykey' }
+    let(:value) { 'myvalue' }
+    let(:metadata) { {
+      'foo' => 'bar',
+      'baz' => 42
+    } }
 
-          result = subject.execute(params);
-          contains = result.key?("beef") and result.key?("pork");
-          expect(contains).to eql(true)
-        end
-        it 'when passed "/test/list/fire" it should return "fox" and "starter" and not "/test/list/fire2/big" or "/test/list/fire2/water"' do
-          params = {
-            'key' => '/test/list/fire'
-          }.merge(shared_params)
+    data_info.each do |summary,info|
+      it "should store key with #{summary} value + metadata to a specific backend in options" do
+        skip info[:skip] if info.has_key?(:skip)
 
-          set_value(params.merge({'key' => '/test/list/fire/fox', 'value' => 'value12'}))
-          set_value(params.merge({'key' => '/test/list/fire/starter', 'value' => 'value12'}))
-          set_value(params.merge({'key' => '/test/list/fire2/water', 'value' => 'value12'}))
-          set_value(params.merge({'key' => '/test/list/fire2/big', 'value' => 'value12'}))
+        is_expected.to run.with_params(key, info[:value] , metadata, @options_test_file).
+          and_return(true)
 
-          result = subject.execute(params);
-          contains = result.key?("fox") and result.key?("starter");
-          size = result.size;
-          expect(contains).to eql(true)
-          expect(size).to eql(2)
-        end
-      end
-      datatype_testspec.each do |hash|
-       if (providerinfo["serialize"] == true)
-         klass = hash[:class]
-       else
-         klass = hash[:nonserial_class]
-       end
-       if (providerinfo["serialize"] == true)
-         expected_retval = hash[:value]
-       else
-         expected_retval = hash[:nonserial_retval]
-       end
-        it "should return an object of type #{klass} for /list/#{hash[:key]}" do
-          params = {
-             'key' => "/list/" + hash[:key] + "/value",
-             'value' => hash[:value],
-          }.merge(shared_params)
-          call_function("libkv::put", params)
-
-          params = {
-             'key' => "/list/" + hash[:key],
-          }.merge(shared_params)
-          result = subject.execute(params)
-          expect(result["value"].class.to_s).to eql(klass)
-        end
-        it "should return '#{hash[:value]}' for /list/#{hash[:key]}" do
-          params = {
-             'key' => "/list/" + hash[:key] + "/value",
-             'value' => hash[:value],
-          }.merge(shared_params)
-          call_function("libkv::put", params)
-
-          params = {
-             'key' => "/list/" + hash[:key],
-          }.merge(shared_params)
-          result = subject.execute(params)
-          expect(result["value"]).to eql(expected_retval)
-        end
+        key_file = File.join(@root_path_test_file, 'production', key)
+        expect( File.exist?(key_file) ).to be true
+        expect( File.read(key_file) ).to eq(info[:serialized_value])
       end
     end
+
+    it 'should store key,value,metadata tuple to the default backend in options' do
+      is_expected.to run.with_params(key, value , metadata, @options_default).
+        and_return(true)
+
+      key_file = File.join(@root_path_default, 'production', key)
+      expect( File.exist?(key_file) ).to be true
+    end
+
+    it 'should use environment-less key when environment is empty' do
+      options = @options_default.dup
+      options['environment'] = ''
+      is_expected.to run.with_params(key, value , metadata, options).
+        and_return(true)
+
+      env_key_file = File.join(@root_path_default, 'production', key)
+      expect( File.exist?(env_key_file) ).to be false
+
+      key_file = File.join(@root_path_default, key)
+      expect( File.exist?(key_file) ).to be true
+    end
+
+    it 'should fail when backend put fails and `softfail` is false' do
+      is_expected.to run.with_params(key, value , metadata, @options_failer).
+        and_raise_error(RuntimeError, /libkv Error for libkv::put with key='#{key}'/)
+    end
+
+    it 'should log warning and return false when backend put fails and `softfail` is true' do
+      options = @options_failer.dup
+      options['softfail'] = true
+
+      is_expected.to run.with_params(key, value , metadata, options).
+        and_return(false)
+
+      #FIXME check warning log
+    end
   end
+
+  context 'with libkv::options' do
+    let(:hieradata) { 'multiple_backends_missing_default' }
+
+    it 'should merge libkv::options' do
+      # @options_default will add the missing default backend config and
+      # override the environment setting.  To spot check options merge (which
+      # is fully tested elsewhere), remove the environment setting and verify
+      # we use the default config from the local options Hash and the
+      # environment from libkv::options
+      options = @options_default.dup
+      options.delete('environment')
+      is_expected.to run.with_params('key', 'value', {}, options).
+        and_return(true)
+
+      key_file = File.join(@root_path_default, 'myenv', 'key')
+      expect( File.exist?(key_file) ).to be true
+    end
+  end
+=end
+
+  context 'other error cases' do
+    it 'should fail when key fails validation' do
+      params = [ '$this is an invalid key dir!', @options_test_file ]
+      is_expected.to run.with_params(*params).
+        and_raise_error(ArgumentError, /contains disallowed whitespace/)
+    end
+
+    it 'should fail when libkv cannot be added to the catalog instance' do
+      allow(File).to receive(:exists?).and_return(false)
+      is_expected.to run.with_params('mykeydir', @options_test_file).
+        and_raise_error(LoadError, /libkv Internal Error: unable to load/)
+    end
+
+    it 'should fail when merged libkv options is invalid' do
+      bad_options  = @options_default.merge ({ 'backend' => 'oops_backend' } )
+      is_expected.to run.with_params('mykeydir', bad_options).
+        and_raise_error(ArgumentError,
+        /libkv Configuration Error for libkv::list with keydir='mykeydir'/)
+    end
+  end
+
 end

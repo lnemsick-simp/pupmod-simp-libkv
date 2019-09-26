@@ -6,42 +6,54 @@ Puppet::Functions.create_function(:'libkv::deletetree') do
 
   dispatch :deletetree do
     required_param 'String[1]', :keydir
-    optional_param 'Hash',      :backend_options
+    optional_param 'Hash',      :options
   end
 
   # @param keydir The key folder to be removed
-  # @param backend_options Hash that specifies global libkv options and/or
-  #   the specific backend to use (with or without backend-specific
-  #   configuration).  Will be merged with `libkv::options`.
+  # @param options Hash that specifies global libkv options and/or the specific
+  #   backend to use (with or without backend-specific configuration).
+  #   Will be merged with `libkv::options`.
   #
-  #   Standard options to specify:
+  #   Supported options keys:
   #
-  #   * `softfail`: Boolean.  When set to `true`, this function will return
-  #     a result, even when the operation has failed.  Otherwise, the function
-  #     will fail when the backend operation fails.
-  #     Defaults to `false`.
-  #   * `environment`: String. When set to a non-empty string, the value is
-  #     prepended to the `keydir` parameter in this operation.  Should only be
-  #     set to an empty string when the key being accessed is truly global.
-  #     Defaults to the Puppet environment for the node.
-  #   * `backend`: String.  Name of the backend to use.  Must be a key in the
-  #     'backends' sub-Hash of the merged options Hash.  When absent, this
-  #      function will look for a backend whose name matches the calling Class,
-  #      specific Define, or Define type.  If no match is found, it will use
-  #      the 'default' backend.
-  #   * `backends`: Hash.  Hash of backend configuration in which the
-  #     key is the name of an instance of a backend.
+  #   * `backends`: Hash.  Hash of backend configurations
   #
-  #     * Each backend configuration must be a Hash with the following
-  #       required keys:
+  #     * Each backend configuration in the merged options Hash must be
+  #       a Hash that has the following keys:
   #
+  #       * `type`:  Backend type.
   #       * `id`:  Unique name for the instance of the backend. (Same backend
   #         type can be configured differently).
-  #       * `type`:  Backend type.
   #
-  # @raise [ArgumentError] If the key is invalid, the requested backend does
-  #   not exist in `libkv::options`, or the plugin for the requested backend
-  #   is not available.
+  #      * Other keys for configuration specific to the backend may also be
+  #        present.
+  #
+  #   * `backend`: String.  Name of the backend to use.
+  #
+  #     * When present, must match a key in the `backends` option of the
+  #       merged options Hash.
+  #     * When absent and not specified in `libkv::options`, this function
+  #       will look for a 'default.xxx' backend whose name matches the
+  #       catalog resource id of the calling Class, specific defined type
+  #       instance, or defined type.  If no match is found, it will use
+  #       the 'default' backend.
+  #
+  #   * `environment`: String.  Puppet environment to prepend to keys.
+  #
+  #     * When set to a non-empty string, it is prepended to the key used in
+  #       the backend operation.
+  #     * Should only be set to an empty string when the key being accessed is
+  #       truly global.
+  #     * Defaults to the Puppet environment for the node.
+  #
+  #  * `softfail`: Boolean. Whether to ignore libkv operation failures.
+  #
+  #    * When `true`, this function will return a result even when the operation
+  #      failed at the backend.
+  #    * When `false`, this function will fail when the backend operation failed.
+  #    * Defaults to `false`.
+  #
+  # @raise [ArgumentError] If the key folder or merged backend config is invalid
   #
   # @raise [LoadError] If the libkv adapter cannot be loaded
   #
@@ -52,28 +64,30 @@ Puppet::Functions.create_function(:'libkv::deletetree') do
   #   backend operation fails and 'softfail' is `true` in the merged backend
   #   options
   #
-  def deletetree(keydir, backend_options={})
+  def deletetree(keydir, options={})
     # key validation difficult to do via a type alias, so validate via function
-    call_function('libkv::validate_key', key)
+    call_function('libkv::validate_key', keydir)
 
     # add libkv 'extension' to the catalog instance as needed
     call_function('libkv::add_libkv')
 
-    # determine backend configuration using backend_options, `libkv::options`,
+    # determine backend configuration using options, `libkv::options`,
     # and the list of backends for which plugins have been loaded
     begin
+      calling_resource = call_function('simplib::debug::classtrace').last
+      catalog = closure_scope.find_global_scope.catalog
       merged_options = call_function( 'libkv::get_backend_config',
-        backend_options, catalog.libkv.backends)
-    rescue RuntimeError => e
-      msg = "libkv Configuration Error for libkv::deletetree with key=#{key}: #{e.message}"
+        options, catalog.libkv.backends, calling_resource)
+    rescue ArgumentError => e
+      msg = "libkv Configuration Error for libkv::deletetree with keydir='#{keydir}': #{e.message}"
       raise ArgumentError.new(msg)
     end
 
     # use libkv for delete operation
     backend_result = catalog.libkv.deletetree(key, merged_options)
-    success = !result.has_key?(:err_msg)
+    success = backend_result[:result]
     unless success
-      err_msg =  "libkv::deletetree with key=#{key}: #{backend_result[:err_msg]}"
+      err_msg =  "libkv::deletetree with keydir='#{keydir}': #{backend_result[:err_msg]}"
       if merged_options['softfail']
         Puppet.warning(err_msg)
       else

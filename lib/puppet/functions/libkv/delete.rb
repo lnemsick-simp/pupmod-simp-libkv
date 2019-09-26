@@ -87,7 +87,7 @@ Puppet::Functions.create_function(:'libkv::delete') do
     backend_result = catalog.libkv.delete(key, merged_options)
     success = backend_result[:result]
     unless success
-      err_msg =  "libkv::delete with key=#{key}: #{backend_result[:err_msg]}"
+      err_msg =  "libkv::delete with key='#{key}': #{backend_result[:err_msg]}"
       if merged_options['softfail']
         Puppet.warning(err_msg)
       else
