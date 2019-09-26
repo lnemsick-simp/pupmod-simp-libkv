@@ -41,13 +41,14 @@ describe 'libkv::deletetree' do
     FileUtils.remove_entry_secure(@tmpdir)
   end
 
+  let(:keydir) { 'app1' }
+
   # The tests will verify most of the function behavior without libkv::options
   # specified and then verify options merging when libkv::options is specified.
 
   context 'without libkv::options' do
     let(:test_file_keydir) { File.join(@root_path_test_file, 'production') }
     let(:default_keydir) { File.join(@root_path_default, 'production') }
-    let(:keydir) { 'app1' }
 
     it 'should delete an existing, non-empty key folder in a specific backend in options' do
       actual_keydir = File.join(test_file_keydir, keydir)
@@ -117,7 +118,6 @@ describe 'libkv::deletetree' do
       # environment from libkv::options
       options = @options_default.dup
       options.delete('environment')
-      keydir = 'keydir'
       actual_keydir = File.join(@root_path_default, 'myenv', keydir)
       FileUtils.mkdir_p(actual_keydir)
       is_expected.to run.with_params(keydir, options).and_return(true)
@@ -134,15 +134,15 @@ describe 'libkv::deletetree' do
 
     it 'should fail when libkv cannot be added to the catalog instance' do
       allow(File).to receive(:exists?).and_return(false)
-      is_expected.to run.with_params('mykeydir', @options_test_file).
+      is_expected.to run.with_params(keydir, @options_test_file).
         and_raise_error(LoadError, /libkv Internal Error: unable to load/)
     end
 
     it 'should fail when merged libkv options is invalid' do
       bad_options  = @options_default.merge ({ 'backend' => 'oops_backend' } )
-      is_expected.to run.with_params('mykeydir', bad_options).
+      is_expected.to run.with_params(keydir, bad_options).
         and_raise_error(ArgumentError,
-        /libkv Configuration Error for libkv::deletetree with keydir='mykeydir'/)
+        /libkv Configuration Error for libkv::deletetree with keydir='#{keydir}'/)
     end
   end
 

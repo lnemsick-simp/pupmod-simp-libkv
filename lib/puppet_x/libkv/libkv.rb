@@ -10,7 +10,7 @@
 #   - Unique instance per plugin {id,type} pair requested
 # - Normalizes key values
 # - Serializes value data to be persisted to common JSON format
-# - Deserializes value data to be retreived from common JSON format
+# - Deserializes value data to be retrieved from common JSON format
 # - Delegates actions to appropriate plugin instance
 #
 simp_libkv_adapter_class = Class.new do

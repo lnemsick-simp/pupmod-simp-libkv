@@ -1,5 +1,17 @@
 require 'spec_helper'
 
+def prepopulate_key_files(root_dir, keydir)
+  actual_keydir = File.join(root_dir, keydir)
+  FileUtils.mkdir_p(actual_keydir)
+
+  data_info.each do |description, info|
+    next if (info.has_key?(:skip) || info.has_key?(:deserialized_value))
+
+    filename = File.join(actual_keydir, description.gsub(' ','_'))
+    File.open(filename, 'w') { |file| file.write(info[:serialized_value]) }
+  end
+end
+
 describe 'libkv::list' do
 
 # Going to use file plugin and the test plugins in spec/support/test_plugins
@@ -41,63 +53,75 @@ describe 'libkv::list' do
     FileUtils.remove_entry_secure(@tmpdir)
   end
 
+  let(:keydir) { 'app1' }
+  let(:metadata) { { 'foo' => 'bar', 'baz' => 42 } }
+  let(:key_list) {
+    list = data_info.map { |description, info|
+      if info.has_key?(:skip) || info.has_key?(:deserialized_value)
+        ['skip', nil]
+      else
+        [
+          "#{keydir}/#{description.gsub(' ','_')}",
+          { 'value' => info[:value], 'metadata' => metadata }
+        ]
+      end
+    }.to_h
+    list.delete('skip')
+    list
+  }
+  let(:test_file_keydir) { File.join(@root_path_test_file, 'production') }
+  let(:default_keydir) { File.join(@root_path_default, 'production') }
+
   # The tests will verify most of the function behavior without libkv::options
   # specified and then verify options merging when libkv::options is specified.
 
-=begin
   context 'without libkv::options' do
-    let(:key) { 'mykey' }
-    let(:value) { 'myvalue' }
-    let(:metadata) { {
-      'foo' => 'bar',
-      'baz' => 42
-    } }
 
-    data_info.each do |summary,info|
-      it "should store key with #{summary} value + metadata to a specific backend in options" do
-        skip info[:skip] if info.has_key?(:skip)
+    it 'should retrieve key list from a specific backend in options when keys exist' do
+      prepopulate_key_files(test_file_keydir, keydir)
 
-        is_expected.to run.with_params(key, info[:value] , metadata, @options_test_file).
-          and_return(true)
-
-        key_file = File.join(@root_path_test_file, 'production', key)
-        expect( File.exist?(key_file) ).to be true
-        expect( File.read(key_file) ).to eq(info[:serialized_value])
-      end
+      is_expected.to run.with_params(keydir, @options_test_file).
+          and_return(key_list)
     end
 
-    it 'should store key,value,metadata tuple to the default backend in options' do
-      is_expected.to run.with_params(key, value , metadata, @options_default).
-        and_return(true)
+    it 'should retrieve key list from the default backend in options when keys exist' do
+      prepopulate_key_files(default_keydir, keydir)
 
-      key_file = File.join(@root_path_default, 'production', key)
-      expect( File.exist?(key_file) ).to be true
+      is_expected.to run.with_params(keydir, @options_default).
+          and_return(key_list)
     end
 
-    it 'should use environment-less key when environment is empty' do
+    it 'should return an empty key list when no keys exist but the directory exists' do
+      # directory has to exist or it is considered a failure
+      actual_keydir = File.join(default_keydir, keydir)
+      FileUtils.mkdir_p(actual_keydir)
+
+      is_expected.to run.with_params(keydir, @options_default).and_return({})
+    end
+
+    it 'should fail when the directory does not exist and `softfail` is false' do
+      is_expected.to run.with_params(keydir, @options_default).
+        and_raise_error(RuntimeError, /libkv Error for libkv::list with keydir='#{keydir}'/)
+    end
+
+    it 'should use environment-less keydir when environment is empty' do
       options = @options_default.dup
       options['environment'] = ''
-      is_expected.to run.with_params(key, value , metadata, options).
-        and_return(true)
+      prepopulate_key_files(@root_path_default, keydir)
 
-      env_key_file = File.join(@root_path_default, 'production', key)
-      expect( File.exist?(env_key_file) ).to be false
-
-      key_file = File.join(@root_path_default, key)
-      expect( File.exist?(key_file) ).to be true
+      is_expected.to run.with_params(keydir, options).and_return(key_list)
     end
 
-    it 'should fail when backend put fails and `softfail` is false' do
-      is_expected.to run.with_params(key, value , metadata, @options_failer).
-        and_raise_error(RuntimeError, /libkv Error for libkv::put with key='#{key}'/)
+    it 'should fail when backend list fails and `softfail` is false' do
+      is_expected.to run.with_params(keydir, @options_failer).
+        and_raise_error(RuntimeError, /libkv Error for libkv::list with keydir='#{keydir}'/)
     end
 
-    it 'should log warning and return false when backend put fails and `softfail` is true' do
+    it 'should log warning and return nil when backend list fails and `softfail` is true' do
       options = @options_failer.dup
       options['softfail'] = true
 
-      is_expected.to run.with_params(key, value , metadata, options).
-        and_return(false)
+      is_expected.to run.with_params(keydir, options).and_return(nil)
 
       #FIXME check warning log
     end
@@ -114,14 +138,12 @@ describe 'libkv::list' do
       # environment from libkv::options
       options = @options_default.dup
       options.delete('environment')
-      is_expected.to run.with_params('key', 'value', {}, options).
-        and_return(true)
+      default_keydir = File.join(@root_path_default, 'myenv')
+      prepopulate_key_files(default_keydir, keydir)
 
-      key_file = File.join(@root_path_default, 'myenv', 'key')
-      expect( File.exist?(key_file) ).to be true
+      is_expected.to run.with_params(keydir, options).and_return(key_list)
     end
   end
-=end
 
   context 'other error cases' do
     it 'should fail when key fails validation' do
@@ -132,15 +154,15 @@ describe 'libkv::list' do
 
     it 'should fail when libkv cannot be added to the catalog instance' do
       allow(File).to receive(:exists?).and_return(false)
-      is_expected.to run.with_params('mykeydir', @options_test_file).
+      is_expected.to run.with_params(keydir, @options_test_file).
         and_raise_error(LoadError, /libkv Internal Error: unable to load/)
     end
 
     it 'should fail when merged libkv options is invalid' do
       bad_options  = @options_default.merge ({ 'backend' => 'oops_backend' } )
-      is_expected.to run.with_params('mykeydir', bad_options).
+      is_expected.to run.with_params(keydir, bad_options).
         and_raise_error(ArgumentError,
-        /libkv Configuration Error for libkv::list with keydir='mykeydir'/)
+        /libkv Configuration Error for libkv::list with keydir='#{keydir}'/)
     end
   end
 

@@ -42,10 +42,7 @@ describe 'libkv::get' do
   end
 
   let(:key) { 'mykey' }
-  let(:metadata) { {
-    'foo' => 'bar',
-    'baz' => 42
-  } }
+  let(:metadata) { { 'foo' => 'bar', 'baz' => 42 } }
 
   # The tests will verify most of the function behavior without libkv::options
   # specified and then verify options merging when libkv::options is specified.
@@ -61,8 +58,9 @@ describe 'libkv::get' do
         if info.has_key?(:deserialized_value)
           # Test data includes malformed binary data that is improperly
           # encoded as UTF-8.  Current adapter behavior is fix the encoding
-          # on retrieval, but that behavior may change when testing with
-          # Binary type and binary_file() method on Puppet 5 and 6...
+          # on retrieval, but that behavior may not be needed or change based
+          # on Puppet 5 & 6 acceptance testing with the Binary type and
+          # binary_file().
           skip 'Use case may not apply to libkv::get'
         end
 
