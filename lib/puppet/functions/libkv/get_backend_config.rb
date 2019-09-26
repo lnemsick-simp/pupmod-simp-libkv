@@ -1,5 +1,11 @@
-# Merge and validate backend configuration using the options parameter,
-# `libkv::options` Hiera, and global libkv defaults
+# Create merged backend configuration and then validate it.
+#
+# The `options` argument is merged with `libkv::options` Hiera and global libkv
+# defaults. Validation includes the following checks:
+#
+# * configuration for the selected backend exists
+# * the plugin for the selected backend has been loaded
+# * different configuration for a specific plugin instance does not exist
 #
 # @author https://github.com/simp/pupmod-simp-libkv/graphs/contributors
 #
@@ -14,7 +20,7 @@ Puppet::Functions.create_function(:'libkv::get_backend_config') do
   # @param resource_info Resource string for the Puppet class or define that has
   #   called the libkv function.
   #
-  #   * Examples: 'Class[Myclass]' or 'Mymodule::Mydefine[myinstance]'
+  #   * Examples: 'Class[Mymodule::Myclass]' or 'Mymodule::Mydefine[myinstance]'
   #   * Used to determine the default backend to use, when none is specified
   #     in the libkv options Hash
   #
