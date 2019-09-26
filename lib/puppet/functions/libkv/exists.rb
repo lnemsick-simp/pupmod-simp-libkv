@@ -87,16 +87,14 @@ Puppet::Functions.create_function(:'libkv::exists') do
 
     # use libkv for exists operation
     backend_result = catalog.libkv.exists(key, merged_options)
-    result = nil
-    if result.has_key?(:err_msg)
+    success = backend_result[:result]
+    if success.nil?
       err_msg =  "libkv Error for libkv::exists with key='#{key}': #{backend_result[:err_msg]}"
       if merged_options['softfail']
         Puppet.warning(err_msg)
       else
         raise(err_msg)
       end
-    else
-      result = backend_result[:present]
     end
 
     success
