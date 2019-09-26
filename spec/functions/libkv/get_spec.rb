@@ -41,63 +41,79 @@ describe 'libkv::get' do
     FileUtils.remove_entry_secure(@tmpdir)
   end
 
+  let(:key) { 'mykey' }
+  let(:metadata) { {
+    'foo' => 'bar',
+    'baz' => 42
+  } }
+
   # The tests will verify most of the function behavior without libkv::options
   # specified and then verify options merging when libkv::options is specified.
 
-=begin
   context 'without libkv::options' do
-    let(:key) { 'mykey' }
-    let(:value) { 'myvalue' }
-    let(:metadata) { {
-      'foo' => 'bar',
-      'baz' => 42
-    } }
+    let(:test_file_keydir) { File.join(@root_path_test_file, 'production') }
+    let(:default_keydir) { File.join(@root_path_default, 'production') }
 
     data_info.each do |summary,info|
-      it "should store key with #{summary} value + metadata to a specific backend in options" do
+      it "should retrieve key with #{summary} value + metadata from a specific backend in options" do
         skip info[:skip] if info.has_key?(:skip)
 
-        is_expected.to run.with_params(key, info[:value] , metadata, @options_test_file).
-          and_return(true)
+        if info.has_key?(:deserialized_value)
+          # Test data includes malformed binary data that is improperly
+          # encoded as UTF-8.  Current adapter behavior is fix the encoding
+          # on retrieval, but that behavior may change when testing with
+          # Binary type and binary_file() method on Puppet 5 and 6...
+          skip 'Use case may not apply to libkv::get'
+        end
 
-        key_file = File.join(@root_path_test_file, 'production', key)
-        expect( File.exist?(key_file) ).to be true
-        expect( File.read(key_file) ).to eq(info[:serialized_value])
+        FileUtils.mkdir_p(test_file_keydir)
+        key_file = File.join(test_file_keydir, key)
+        File.open(key_file, 'w') { |file| file.write(info[:serialized_value]) }
+
+        expected = { 'value' => info[:value], 'metadata' => metadata }
+        is_expected.to run.with_params(key, @options_test_file).and_return(expected)
       end
     end
 
-    it 'should store key,value,metadata tuple to the default backend in options' do
-      is_expected.to run.with_params(key, value , metadata, @options_default).
-        and_return(true)
+    it 'should retrieve the key,value,metadata tuple from the default backend in options' do
+      FileUtils.mkdir_p(default_keydir)
+      key_file = File.join(default_keydir, key)
+      File.open(key_file, 'w') { |file| file.write(data_info['Boolean'][:serialized_value]) }
 
-      key_file = File.join(@root_path_default, 'production', key)
-      expect( File.exist?(key_file) ).to be true
+      expected = { 'value' => data_info['Boolean'][:value], 'metadata' => metadata }
+      is_expected.to run.with_params(key, @options_default).and_return(expected)
+    end
+
+    it 'should return only value when backend metadata is empty' do
+      FileUtils.mkdir_p(default_keydir)
+      key_file = File.join(default_keydir, key)
+      File.open(key_file, 'w') { |file| file.write('{"value":"some string"}') }
+
+      expected = { 'value' => 'some string' }
+      is_expected.to run.with_params(key, @options_default).and_return(expected)
     end
 
     it 'should use environment-less key when environment is empty' do
       options = @options_default.dup
       options['environment'] = ''
-      is_expected.to run.with_params(key, value , metadata, options).
-        and_return(true)
-
-      env_key_file = File.join(@root_path_default, 'production', key)
-      expect( File.exist?(env_key_file) ).to be false
-
+      FileUtils.mkdir_p(@root_path_default)
       key_file = File.join(@root_path_default, key)
-      expect( File.exist?(key_file) ).to be true
+      File.open(key_file, 'w') { |file| file.write(data_info['Boolean'][:serialized_value]) }
+
+      expected = { 'value' => data_info['Boolean'][:value], 'metadata' => metadata }
+      is_expected.to run.with_params(key, options).and_return(expected)
     end
 
-    it 'should fail when backend put fails and `softfail` is false' do
-      is_expected.to run.with_params(key, value , metadata, @options_failer).
-        and_raise_error(RuntimeError, /libkv Error for libkv::put with key='#{key}'/)
+    it 'should fail when backend get fails and `softfail` is false' do
+      is_expected.to run.with_params(key, @options_failer).
+        and_raise_error(RuntimeError, /libkv Error for libkv::get with key='#{key}'/)
     end
 
-    it 'should log warning and return false when backend put fails and `softfail` is true' do
+    it 'should log warning and return nil when backend get fails and `softfail` is true' do
       options = @options_failer.dup
       options['softfail'] = true
 
-      is_expected.to run.with_params(key, value , metadata, options).
-        and_return(false)
+      is_expected.to run.with_params(key, options).and_return(nil)
 
       #FIXME check warning log
     end
@@ -114,14 +130,15 @@ describe 'libkv::get' do
       # environment from libkv::options
       options = @options_default.dup
       options.delete('environment')
-      is_expected.to run.with_params('key', 'value', {}, options).
-        and_return(true)
+      default_keydir = File.join(@root_path_default, 'myenv')
+      FileUtils.mkdir_p(default_keydir)
+      key_file = File.join(default_keydir, key)
+      File.open(key_file, 'w') { |file| file.write(data_info['Boolean'][:serialized_value]) }
 
-      key_file = File.join(@root_path_default, 'myenv', 'key')
-      expect( File.exist?(key_file) ).to be true
+      expected = { 'value' => data_info['Boolean'][:value], 'metadata' => metadata }
+      is_expected.to run.with_params(key, options).and_return(expected)
     end
   end
-=end
 
   context 'other error cases' do
     it 'should fail when key fails validation' do

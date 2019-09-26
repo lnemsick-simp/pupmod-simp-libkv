@@ -394,7 +394,7 @@ simp_libkv_adapter_class = Class.new do
       result[:value] = encapsulation['value']
     end
 
-    result[:metadata] =  encapsulation['metadata']
+    result[:metadata] = encapsulation['metadata']
 
     result
   end
