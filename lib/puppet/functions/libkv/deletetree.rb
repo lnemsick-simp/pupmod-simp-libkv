@@ -18,10 +18,11 @@ Puppet::Functions.create_function(:'libkv::deletetree') do
   #
   #   * `softfail`: Boolean.  When set to `true`, this function will return
   #     a result, even when the operation has failed.  Otherwise, the function
-  #     will fail when the backend operation fails. Defaults to `false`.
+  #     will fail when the backend operation fails.
+  #     Defaults to `false`.
   #   * `environment`: String. When set to a non-empty string, the value is
-  #     prepended to the `key` parameter in this operation.  Should only be set
-  #     to an empty string when the key being accessed is truly global.
+  #     prepended to the `keydir` parameter in this operation.  Should only be
+  #     set to an empty string when the key being accessed is truly global.
   #     Defaults to the Puppet environment for the node.
   #   * `backend`: String.  Name of the backend to use.  Must be a key in the
   #     'backends' sub-Hash of the merged options Hash.  When absent, this

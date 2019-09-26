@@ -35,19 +35,19 @@ Puppet::Functions.create_function(:'libkv::validate_key') do
     ws_regex = /[[:space:]]/
     if (key =~ ws_regex)
       msg = "key '#{key}' contains disallowed whitespace"
-      raise(msg)
+      raise ArgumentError.new(msg)
     end
 
     char_regex = /^[a-zA-Z0-9._:\-\/]+$/m
     unless (key =~ char_regex)
       msg = "key '#{key}' contains unsupported characters.  Allowed set=[a-zA-Z0-9._:-/]"
-      raise(msg)
+      raise ArgumentError.new(msg)
     end
 
     dot_regex = /\/\.\.?\//
     if (key =~ dot_regex)
       msg = "key '#{key}' contains disallowed '/./' or '/../' sequence"
-      raise(msg)
+      raise ArgumentError.new(msg)
     end
   end
 

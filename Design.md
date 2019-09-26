@@ -465,13 +465,14 @@ the (`type`,`id`) pair defines a unique configuration.
 * `type` must be unique across all backend plugins, including those
   provided by other modules.
 * `id` must be unique for a each distinct configuration for a `type`
+* Other keys for configuration specific to the backend may also be present.
 
 #### Default Backend Selection
 
    * When absent, a backend configuration named `default` must exist in
      `backends`.
 
-# Each function has an optional backend_options Hash parameter that will be
+# Each function has an optional options Hash parameter that will be
 deep merged with this Hash.
 # *  If the merged Hash contains the key 'backend', it will specify which
 #    backend to use in the 'backends' sub-Hash below.
@@ -601,7 +602,7 @@ Each function body will affect the operation requested by doing the following:
 
 #### Common Function Options
 
-Each libkv Puppet function will have an optional `backend_options` Hash parameter.
+Each libkv Puppet function will have an optional `options` Hash parameter.
 This parameter can be used to specify global libkv options and/or the specific
 backend to use (with or without backend-specific configuration).  This Hash
 will be merged with the configuration found in the `libkv::options`` Hiera
@@ -628,7 +629,7 @@ The standard options available are as follows:
 * libkv::put: Sets the data at `key` to a `value` in the configured backend.
   Optionally sets metadata along with the `value`.
 
-  * `Boolean libkv::put(String key, NotUndef value, Hash metadata={}, Hash backend_options={})`
+  * `Boolean libkv::put(String key, NotUndef value, Hash metadata={}, Hash options={})`
   * Raises upon backend failure, unless `options['softfail']` is `true`
   * Returns `true` when backend operation succeeds
   * Returns `false` when backend operation fails and `options['softfail']`
@@ -637,7 +638,7 @@ The standard options available are as follows:
 * libkv::get: Retrieves the value and any metadata stored at `key` from the
   configured backend.
 
-  * `Enum[Hash,Undef] libkv::get(String key, Hash backend_options={})`
+  * `Enum[Hash,Undef] libkv::get(String key, Hash options={})`
   * Raises upon backend failure, unless `options['softfail']` is `true`
   * Returns a Hash when the backend operation succeeds
 
@@ -651,7 +652,7 @@ The standard options available are as follows:
 
 * libkv::delete: Deletes a `key` from the configured backend.
 
-  * `Boolean libkv::delete(String key, Hash backend_options={})`
+  * `Boolean libkv::delete(String key, Hash options={})`
   * Raises upon backend failure, unless `options['softfail']` is `true`
   * Returns `true` when backend operation succeeds
   * Returns `false` when backend operation fails and `options['softfail']`
@@ -659,7 +660,7 @@ The standard options available are as follows:
 
 * libkv::exists: Returns whether the `key` exists in the configured backend.
 
-  * `Enum[Boolean,Undef] libkv::exists(String key, Hash backend_options={})`
+  * `Enum[Boolean,Undef] libkv::exists(String key, Hash options={})`
   * Raises upon backend failure, unless `options['softfail']` is `true`
   * Returns key status (`true` or `false`), when the backend operation succeeds
   * Returns `nil`, when the backend operation fails and `options['softfail']`
@@ -667,7 +668,7 @@ The standard options available are as follows:
 
 * libkv::list: Returns a list of all keys in a folder.
 
-  * `Enum[Hash,Undef] libkv::list(String keydir, Hash backend_options={})`
+  * `Enum[Hash,Undef] libkv::list(String keydir, Hash options={})`
   * Raises upon backend failure, unless `options['softfail']` is `true`
   * Returns a Hash when the backend operation succeeds
 
@@ -690,7 +691,7 @@ The standard options available are as follows:
 
 * libkv::deletetree: Deletes a whole folder from the configured backend.
 
-  * `Boolean libkv::deletetree(String keydir, Hash backend_options={})`
+  * `Boolean libkv::deletetree(String keydir, Hash options={})`
   * Raises upon backend failure, unless `options['softfail']` is `true`
   * Returns `true` when backend operation succeeds
   * Returns `false` when backend operation fails and `options['softfail']`

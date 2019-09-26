@@ -241,7 +241,7 @@ describe 'libkv adapter anonymous class' do
 
     testvalues = {
       'Boolean' => {
-        :value            =>true,
+        :value            => true,
         :serialized_value => '{"value":true,"metadata":{"foo":"bar","baz":42}}'
       },
       'valid UTF-8 String' =>  {
