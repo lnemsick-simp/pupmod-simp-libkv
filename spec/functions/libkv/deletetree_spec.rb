@@ -44,60 +44,63 @@ describe 'libkv::deletetree' do
   # The tests will verify most of the function behavior without libkv::options
   # specified and then verify options merging when libkv::options is specified.
 
-=begin
   context 'without libkv::options' do
-    let(:key) { 'mykey' }
-    let(:value) { 'myvalue' }
-    let(:metadata) { {
-      'foo' => 'bar',
-      'baz' => 42
-    } }
+    let(:test_file_keydir) { File.join(@root_path_test_file, 'production') }
+    let(:default_keydir) { File.join(@root_path_default, 'production') }
+    let(:keydir) { 'app1' }
 
-    data_info.each do |summary,info|
-      it "should store key with #{summary} value + metadata to a specific backend in options" do
-        skip info[:skip] if info.has_key?(:skip)
+    it 'should delete an existing, non-empty key folder in a specific backend in options' do
+      actual_keydir = File.join(test_file_keydir, keydir)
+      FileUtils.mkdir_p(actual_keydir)
+      key_file = File.join(actual_keydir, 'key')
+      FileUtils.touch(key_file)
 
-        is_expected.to run.with_params(key, info[:value] , metadata, @options_test_file).
-          and_return(true)
-
-        key_file = File.join(@root_path_test_file, 'production', key)
-        expect( File.exist?(key_file) ).to be true
-        expect( File.read(key_file) ).to eq(info[:serialized_value])
-      end
+      is_expected.to run.with_params(keydir, @options_test_file).and_return(true)
+      expect( Dir.exist?(actual_keydir) ).to be false
     end
 
-    it 'should store key,value,metadata tuple to the default backend in options' do
-      is_expected.to run.with_params(key, value , metadata, @options_default).
-        and_return(true)
+    it 'should delete an existing key folder in the default backend in options' do
+      actual_keydir = File.join(default_keydir, keydir)
+      FileUtils.mkdir_p(actual_keydir)
+      key_file = File.join(actual_keydir, 'key')
+      FileUtils.touch(key_file)
 
-      key_file = File.join(@root_path_default, 'production', key)
-      expect( File.exist?(key_file) ).to be true
+      is_expected.to run.with_params(keydir, @options_default).and_return(true)
+      expect( Dir.exist?(actual_keydir) ).to be false
     end
 
-    it 'should use environment-less key when environment is empty' do
+    it 'should delete an existing empty key folder in a specific backend in options' do
+      actual_keydir = File.join(test_file_keydir, keydir)
+      FileUtils.mkdir_p(actual_keydir)
+
+      is_expected.to run.with_params(keydir, @options_test_file).and_return(true)
+      expect( Dir.exist?(actual_keydir) ).to be false
+    end
+
+    it 'should succeed even when the key foler does not exist in a specific backend in options' do
+      is_expected.to run.with_params(keydir, @options_test_file).and_return(true)
+    end
+
+    it 'should use environment-less key folder when environment is empty' do
       options = @options_default.dup
       options['environment'] = ''
-      is_expected.to run.with_params(key, value , metadata, options).
-        and_return(true)
+      actual_keydir = File.join(@root_path_default, keydir)
+      FileUtils.mkdir_p(actual_keydir)
 
-      env_key_file = File.join(@root_path_default, 'production', key)
-      expect( File.exist?(env_key_file) ).to be false
-
-      key_file = File.join(@root_path_default, key)
-      expect( File.exist?(key_file) ).to be true
+      is_expected.to run.with_params(keydir, options).and_return(true)
+      expect( File.exist?(actual_keydir) ).to be false
     end
 
-    it 'should fail when backend put fails and `softfail` is false' do
-      is_expected.to run.with_params(key, value , metadata, @options_failer).
-        and_raise_error(RuntimeError, /libkv Error for libkv::put with key='#{key}'/)
+    it 'should fail when backend deletetree fails and `softfail` is false' do
+      is_expected.to run.with_params(keydir, @options_failer).
+        and_raise_error(RuntimeError, /libkv Error for libkv::deletetree with keydir='#{keydir}'/)
     end
 
-    it 'should log warning and return false when backend put fails and `softfail` is true' do
+    it 'should log warning and return false when backend deletetree fails and `softfail` is true' do
       options = @options_failer.dup
       options['softfail'] = true
 
-      is_expected.to run.with_params(key, value , metadata, options).
-        and_return(false)
+      is_expected.to run.with_params(keydir, options).and_return(false)
 
       #FIXME check warning log
     end
@@ -114,14 +117,13 @@ describe 'libkv::deletetree' do
       # environment from libkv::options
       options = @options_default.dup
       options.delete('environment')
-      is_expected.to run.with_params('key', 'value', {}, options).
-        and_return(true)
-
-      key_file = File.join(@root_path_default, 'myenv', 'key')
-      expect( File.exist?(key_file) ).to be true
+      keydir = 'keydir'
+      actual_keydir = File.join(@root_path_default, 'myenv', keydir)
+      FileUtils.mkdir_p(actual_keydir)
+      is_expected.to run.with_params(keydir, options).and_return(true)
+      expect( File.exist?(actual_keydir) ).to be false
     end
   end
-=end
 
   context 'other error cases' do
     it 'should fail when key folder fails validation' do

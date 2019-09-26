@@ -84,7 +84,7 @@ Puppet::Functions.create_function(:'libkv::deletetree') do
     end
 
     # use libkv for delete operation
-    backend_result = catalog.libkv.deletetree(key, merged_options)
+    backend_result = catalog.libkv.deletetree(keydir, merged_options)
     success = backend_result[:result]
     unless success
       err_msg =  "libkv Error for libkv::deletetree with keydir='#{keydir}': #{backend_result[:err_msg]}"
