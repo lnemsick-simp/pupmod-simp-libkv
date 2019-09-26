@@ -77,7 +77,7 @@ Puppet::Functions.create_function(:'libkv::get') do
     # determine backend configuration using options, `libkv::options`,
     # and the list of backends for which plugins have been loaded
     begin
-      calling_resource = call_function('simplib::debug::classtrace').last
+      calling_resource = call_function('simplib::debug::classtrace', false).last
       catalog = closure_scope.find_global_scope.catalog
       merged_options = call_function( 'libkv::get_backend_config',
         options, catalog.libkv.backends, calling_resource)
@@ -91,7 +91,7 @@ Puppet::Functions.create_function(:'libkv::get') do
 
     result = backend_result[:result]
     if result.nil?
-      err_msg =  "libkv::get with key='#{key}': #{backend_result[:err_msg]}"
+      err_msg =  "libkv Error for libkv::get with key='#{key}': #{backend_result[:err_msg]}"
       if merged_options['softfail']
         Puppet.warning(err_msg)
       else

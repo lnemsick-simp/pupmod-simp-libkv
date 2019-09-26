@@ -44,60 +44,54 @@ describe 'libkv::delete' do
   # The tests will verify most of the function behavior without libkv::options
   # specified and then verify options merging when libkv::options is specified.
 
-=begin
   context 'without libkv::options' do
+    let(:test_file_keydir) { File.join(@root_path_test_file, 'production') }
+    let(:default_keydir) { File.join(@root_path_default, 'production') }
     let(:key) { 'mykey' }
-    let(:value) { 'myvalue' }
-    let(:metadata) { {
-      'foo' => 'bar',
-      'baz' => 42
-    } }
 
-    data_info.each do |summary,info|
-      it "should store key with #{summary} value + metadata to a specific backend in options" do
-        skip info[:skip] if info.has_key?(:skip)
+    it 'should delete an existing key in a specific backend in options' do
+      FileUtils.mkdir_p(test_file_keydir)
+      key_file = File.join(test_file_keydir, key)
+      FileUtils.touch(key_file)
 
-        is_expected.to run.with_params(key, info[:value] , metadata, @options_test_file).
-          and_return(true)
-
-        key_file = File.join(@root_path_test_file, 'production', key)
-        expect( File.exist?(key_file) ).to be true
-        expect( File.read(key_file) ).to eq(info[:serialized_value])
-      end
+      is_expected.to run.with_params(key, @options_test_file).and_return(true)
+      expect( File.exist?(key_file) ).to be false
     end
 
-    it 'should store key,value,metadata tuple to the default backend in options' do
-      is_expected.to run.with_params(key, value , metadata, @options_default).
-        and_return(true)
+    it 'should delete an existing key in the default backend in options' do
+      FileUtils.mkdir_p(default_keydir)
+      key_file = File.join(default_keydir, key)
+      FileUtils.touch(key_file)
 
-      key_file = File.join(@root_path_default, 'production', key)
-      expect( File.exist?(key_file) ).to be true
+      is_expected.to run.with_params(key, @options_default).and_return(true)
+      expect( File.exist?(key_file) ).to be false
+    end
+
+    it 'should succeed even when the key does not exist in a specific backend in options' do
+      is_expected.to run.with_params(key, @options_test_file).and_return(true)
     end
 
     it 'should use environment-less key when environment is empty' do
       options = @options_default.dup
       options['environment'] = ''
-      is_expected.to run.with_params(key, value , metadata, options).
-        and_return(true)
-
-      env_key_file = File.join(@root_path_default, 'production', key)
-      expect( File.exist?(env_key_file) ).to be false
-
+      FileUtils.mkdir_p(@root_path_default)
       key_file = File.join(@root_path_default, key)
-      expect( File.exist?(key_file) ).to be true
+      FileUtils.touch(key_file)
+
+      is_expected.to run.with_params(key, options).and_return(true)
+      expect( File.exist?(key_file) ).to be false
     end
 
-    it 'should fail when backend put fails and `softfail` is false' do
-      is_expected.to run.with_params(key, value , metadata, @options_failer).
-        and_raise_error(RuntimeError, /libkv Error for libkv::put with key='#{key}'/)
+    it 'should fail when backend delete fails and `softfail` is false' do
+      is_expected.to run.with_params(key, @options_failer).
+        and_raise_error(RuntimeError, /libkv Error for libkv::delete with key='#{key}'/)
     end
 
-    it 'should log warning and return false when backend put fails and `softfail` is true' do
+    it 'should log warning and return false when backend delete fails and `softfail` is true' do
       options = @options_failer.dup
       options['softfail'] = true
 
-      is_expected.to run.with_params(key, value , metadata, options).
-        and_return(false)
+      is_expected.to run.with_params(key, options).and_return(false)
 
       #FIXME check warning log
     end
@@ -114,14 +108,15 @@ describe 'libkv::delete' do
       # environment from libkv::options
       options = @options_default.dup
       options.delete('environment')
-      is_expected.to run.with_params('key', 'value', {}, options).
-        and_return(true)
+      default_keydir = File.join(@root_path_default, 'myenv')
+      FileUtils.mkdir_p(default_keydir)
+      key_file = File.join(default_keydir, 'key')
+      FileUtils.touch(key_file)
 
-      key_file = File.join(@root_path_default, 'myenv', 'key')
-      expect( File.exist?(key_file) ).to be true
+      is_expected.to run.with_params('key', options).and_return(true)
+      expect( File.exist?(key_file) ).to be false
     end
   end
-=end
 
   context 'other error cases' do
     it 'should fail when key fails validation' do
@@ -138,8 +133,7 @@ describe 'libkv::delete' do
 
     it 'should fail when merged libkv options is invalid' do
       bad_options  = @options_default.merge ({ 'backend' => 'oops_backend' } )
-      is_expected.to run.with_params('mykey', bad_options).
-        and_raise_error(ArgumentError,
+      is_expected.to run.with_params('mykey', bad_options).  and_raise_error(ArgumentError,
         /libkv Configuration Error for libkv::delete with key='mykey'/)
     end
   end
