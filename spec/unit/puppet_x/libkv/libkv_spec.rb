@@ -1,10 +1,7 @@
 require 'spec_helper'
-require 'data_helper'
 
 require 'fileutils'
 require 'tmpdir'
-
-include DataHelper
 
 # mimic loading that is done in loader.rb, but be sure to load what is in
 # the fixtures dir

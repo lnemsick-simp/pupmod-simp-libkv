@@ -3,6 +3,9 @@ require 'rspec-puppet'
 require 'simp/rspec-puppet-facts'
 include Simp::RspecPuppetFacts
 
+require 'data_helper'
+include DataHelper
+
 require 'pathname'
 
 # RSpec Material
