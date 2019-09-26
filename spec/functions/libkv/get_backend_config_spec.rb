@@ -3,7 +3,7 @@ require 'spec_helper'
 describe 'libkv::get_backend_config' do
 
   let(:backends) { [ 'file' ] }
-  let(:class_resource)           { 'Class[Pki]' }
+  let(:class_resource)           { 'Class[Mymodule::Myclass]' }
 
   context 'libkv::options not specified' do
     let(:environment) { 'myenv' }
@@ -164,7 +164,7 @@ describe 'libkv::get_backend_config' do
         'environment' => 'myenv',
         'softfail'    => false,
         'backends'    => {
-          'default.Class[Pki]' => {
+          'default.Class[Mymodule::Myclass]' => {
             'type'                 => 'file',
             'id'                   => 'file',
             'root_path'            => '/var/simp/libkv/file',
@@ -222,10 +222,14 @@ describe 'libkv::get_backend_config' do
     end
 
     context "hierarchy missing 'default'" do
-      it "should fail when no match is found and 'default' backend not specified" do
-     end
-    end
+      let(:hieradata) { 'multiple_backends_missing_default' }
 
+      it "should fail when no match is found and 'default' backend not specified" do
+        is_expected.to run.with_params({}, backends, 'Class[Bob]').
+        and_raise_error(ArgumentError,
+        /No libkv backend 'default' with 'id' and 'type' attributes has been configured/)
+      end
+    end
   end
 
 end

@@ -196,9 +196,9 @@ general requirements:
   * the set of default configurations must allow the user to specify a
     hiearchy of defaults
 
-    * configuration for specific classes (e.g., `Class[Pki]`)
-    * configuration for specific Defines (e.g., `Mydefine[Myinstance]`)
-    * configuration for all Defines of a specific type (e.g., `Mydefine`)
+    * configuration for specific classes (e.g., `Class[Mymodule::Myclass]`)
+    * configuration for specific Defines (e.g., `Mymodules::Mydefine[instance]`)
+    * configuration for all Defines of a specific type (e.g., `Mymodule::Mydefine`)
     * configuration for all remaining resources
 
 * When a set of default configurations is specified, the most-specific
@@ -438,8 +438,8 @@ conform to the following conventions:
   * `default.Class[<class>]` specifies the default backend configuration
     for a specific Class resource.  The `Class[<class>]` portion of the
     name is how the Class resource is represented in the Puppet catalog.
-    For example, for the `pki` Class, the appropriate backend name will be
-    `default.Class[Pki]`.
+    For example, for the `mymodule::myclass` Class, the appropriate backend
+    name will be `default.Class[Mymodule::Myclass]`.
 
   * `default.<Defined type>[<instance>]` specifies the default
     backend configuration for a specific Define resource.  The
@@ -557,8 +557,8 @@ configuration defaults is specified.
     #  * Individual resources can override the default by specifying
     #    a `backend` key in its backend options hash.
     backends:
-      # pki Class resource
-      "default.Class[Pki]":                     "%{alias('libkv::backend::consul')}"
+      # mymodule::myclass Class resource
+      "default.Class[Mymodule::Myclass]":       "%{alias('libkv::backend::consul')}"
 
       # specific instance of mymodule::mydefine defined type
       "default.Mymodule::Mydefine[Myinstance]": "%{alias('libkv::backend::consul')}"

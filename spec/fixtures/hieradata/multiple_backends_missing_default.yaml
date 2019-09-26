@@ -28,7 +28,7 @@
     #  * Individual resources can override the default by specifying
     #    a `backend` key in its backend options hash.
     backends:
-      # pki Class resource
+      # mymodule::myclass Class resource
       "default.Class[Mymodule::Myclass]":       "%{alias('libkv::backend::file')}"
 
       # specific instance of mymodule::mydefine defined type
@@ -37,6 +37,7 @@
       # all mymodule::mydefine instances not matching a specific instance default
       "default.Mymodule::Mydefine":             "%{alias('libkv::backend::file')}"
 
-      # all other resources
-      "default":                                "%{alias('libkv::backend::file')}"
+# Missing default
+#      # all other resources
+#      "default":                                "%{alias('libkv::backend::file')}"
 
