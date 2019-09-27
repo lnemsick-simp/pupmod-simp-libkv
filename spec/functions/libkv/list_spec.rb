@@ -54,16 +54,14 @@ describe 'libkv::list' do
   end
 
   let(:keydir) { 'app1' }
-  let(:metadata) { { 'foo' => 'bar', 'baz' => 42 } }
   let(:key_list) {
     list = data_info.map { |description, info|
       if info.has_key?(:skip) || info.has_key?(:deserialized_value)
         ['skip', nil]
       else
-        [
-          "#{keydir}/#{description.gsub(' ','_')}",
-          { 'value' => info[:value], 'metadata' => metadata }
-        ]
+        info_hash = { 'value' => info[:value] }
+        info_hash['metadata'] = info[:metadata] unless info[:metadata].empty?
+        [ "#{keydir}/#{description.gsub(' ','_')}", info_hash ]
       end
     }.to_h
     list.delete('skip')

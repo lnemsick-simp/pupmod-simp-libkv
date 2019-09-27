@@ -47,17 +47,14 @@ describe 'libkv::put' do
   context 'without libkv::options' do
     let(:key) { 'mykey' }
     let(:value) { 'myvalue' }
-    let(:metadata) { {
-      'foo' => 'bar',
-      'baz' => 42
-    } }
+    let(:metadata) { { 'foo' => 'bar', 'baz' => 42 } }
 
     data_info.each do |summary,info|
       it "should store key with #{summary} value + metadata to a specific backend in options" do
         skip info[:skip] if info.has_key?(:skip)
 
-        is_expected.to run.with_params(key, info[:value] , metadata, @options_test_file).
-          and_return(true)
+        params = [ key, info[:value] , info[:metadata], @options_test_file ]
+        is_expected.to run.with_params(*params).and_return(true)
 
         key_file = File.join(@root_path_test_file, 'production', key)
         expect( File.exist?(key_file) ).to be true

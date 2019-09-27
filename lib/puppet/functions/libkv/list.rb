@@ -100,8 +100,8 @@ Puppet::Functions.create_function(:'libkv::list') do
     else
       result = {}
       backend_result[:result].each do |key,info|
-         result[key] = { 'value' => info[:value]}
-         if info[:metadata]
+         result[key] = { 'value' => info[:value] }
+         unless info[:metadata].empty?
           result[key]['metadata'] = info[:metadata]
         end
       end

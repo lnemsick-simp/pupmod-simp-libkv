@@ -42,7 +42,9 @@ describe 'libkv::get' do
   end
 
   let(:key) { 'mykey' }
+  let(:value) { false }
   let(:metadata) { { 'foo' => 'bar', 'baz' => 42 } }
+  let(:serialized_value) { '{"value":false,"metadata":{"foo":"bar","baz":42}}' }
 
   # The tests will verify most of the function behavior without libkv::options
   # specified and then verify options merging when libkv::options is specified.
@@ -68,7 +70,8 @@ describe 'libkv::get' do
         key_file = File.join(test_file_keydir, key)
         File.open(key_file, 'w') { |file| file.write(info[:serialized_value]) }
 
-        expected = { 'value' => info[:value], 'metadata' => metadata }
+        expected = { 'value' => info[:value] }
+        expected['metadata'] = info[:metadata] unless info[:metadata].empty?
         is_expected.to run.with_params(key, @options_test_file).and_return(expected)
       end
     end
@@ -76,18 +79,9 @@ describe 'libkv::get' do
     it 'should retrieve the key,value,metadata tuple from the default backend in options' do
       FileUtils.mkdir_p(default_keydir)
       key_file = File.join(default_keydir, key)
-      File.open(key_file, 'w') { |file| file.write(data_info['Boolean'][:serialized_value]) }
+      File.open(key_file, 'w') { |file| file.write(serialized_value) }
 
-      expected = { 'value' => data_info['Boolean'][:value], 'metadata' => metadata }
-      is_expected.to run.with_params(key, @options_default).and_return(expected)
-    end
-
-    it 'should return only value when backend metadata is empty' do
-      FileUtils.mkdir_p(default_keydir)
-      key_file = File.join(default_keydir, key)
-      File.open(key_file, 'w') { |file| file.write('{"value":"some string"}') }
-
-      expected = { 'value' => 'some string' }
+      expected = { 'value' => value, 'metadata' => metadata }
       is_expected.to run.with_params(key, @options_default).and_return(expected)
     end
 
@@ -96,9 +90,9 @@ describe 'libkv::get' do
       options['environment'] = ''
       FileUtils.mkdir_p(@root_path_default)
       key_file = File.join(@root_path_default, key)
-      File.open(key_file, 'w') { |file| file.write(data_info['Boolean'][:serialized_value]) }
+      File.open(key_file, 'w') { |file| file.write(serialized_value) }
 
-      expected = { 'value' => data_info['Boolean'][:value], 'metadata' => metadata }
+      expected = { 'value' => value, 'metadata' => metadata }
       is_expected.to run.with_params(key, options).and_return(expected)
     end
 
@@ -131,9 +125,9 @@ describe 'libkv::get' do
       default_keydir = File.join(@root_path_default, 'myenv')
       FileUtils.mkdir_p(default_keydir)
       key_file = File.join(default_keydir, key)
-      File.open(key_file, 'w') { |file| file.write(data_info['Boolean'][:serialized_value]) }
+      File.open(key_file, 'w') { |file| file.write(serialized_value) }
 
-      expected = { 'value' => data_info['Boolean'][:value], 'metadata' => metadata }
+      expected = { 'value' => value, 'metadata' => metadata }
       is_expected.to run.with_params(key, options).and_return(expected)
     end
   end

@@ -224,16 +224,11 @@ describe 'libkv adapter anonymous class' do
       @adapter = simp_libkv_adapter_class.new
     end
 
-    let(:metadata) { {
-      'foo' => 'bar',
-      'baz' => 42
-    } }
-
     context '#serialize and #serialize_string_value' do
       data_info.each do |summary,info|
         it "should properly serialize a #{summary}" do
           skip info[:skip] if info.has_key?(:skip)
-          expect( @adapter.serialize(info[:value], metadata) ).
+          expect( @adapter.serialize(info[:value], info[:metadata]) ).
             to eq info[:serialized_value]
         end
       end
@@ -245,7 +240,7 @@ describe 'libkv adapter anonymous class' do
           skip info[:skip] if info.has_key?(:skip)
           expected = info.has_key?(:deserialized_value) ? info[:deserialized_value] : info[:value]
           expect( @adapter.deserialize(info[:serialized_value]) ).
-            to eq({ :value => expected, :metadata => metadata })
+            to eq({ :value => expected, :metadata => info[:metadata] })
         end
       end
 

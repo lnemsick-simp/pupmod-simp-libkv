@@ -98,9 +98,8 @@ Puppet::Functions.create_function(:'libkv::get') do
         raise(err_msg)
       end
     else
-      result = {}
-      result['value'] = backend_result[:result][:value]
-      if backend_result[:result][:metadata]
+      result = { 'value' => backend_result[:result][:value] }
+      unless backend_result[:result][:metadata].empty?
         result['metadata'] = backend_result[:result][:metadata]
       end
     end
