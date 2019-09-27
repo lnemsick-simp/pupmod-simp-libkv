@@ -67,8 +67,8 @@ describe 'libkv::list' do
     list.delete('skip')
     list
   }
-  let(:test_file_keydir) { File.join(@root_path_test_file, 'production') }
-  let(:default_keydir) { File.join(@root_path_default, 'production') }
+  let(:test_file_env_root_dir) { File.join(@root_path_test_file, 'production') }
+  let(:default_env_root_dir) { File.join(@root_path_default, 'production') }
 
   # The tests will verify most of the function behavior without libkv::options
   # specified and then verify options merging when libkv::options is specified.
@@ -76,14 +76,14 @@ describe 'libkv::list' do
   context 'without libkv::options' do
 
     it 'should retrieve key list from a specific backend in options when keys exist' do
-      prepopulate_key_files(test_file_keydir, keydir)
+      prepopulate_key_files(test_file_env_root_dir, keydir)
 
       is_expected.to run.with_params(keydir, @options_test_file).
           and_return(key_list)
     end
 
     it 'should retrieve key list from the default backend in options when keys exist' do
-      prepopulate_key_files(default_keydir, keydir)
+      prepopulate_key_files(default_env_root_dir, keydir)
 
       is_expected.to run.with_params(keydir, @options_default).
           and_return(key_list)
@@ -91,7 +91,7 @@ describe 'libkv::list' do
 
     it 'should return an empty key list when no keys exist but the directory exists' do
       # directory has to exist or it is considered a failure
-      actual_keydir = File.join(default_keydir, keydir)
+      actual_keydir = File.join(default_env_root_dir, keydir)
       FileUtils.mkdir_p(actual_keydir)
 
       is_expected.to run.with_params(keydir, @options_default).and_return({})
@@ -136,8 +136,8 @@ describe 'libkv::list' do
       # environment from libkv::options
       options = @options_default.dup
       options.delete('environment')
-      default_keydir = File.join(@root_path_default, 'myenv')
-      prepopulate_key_files(default_keydir, keydir)
+      default_env_root_dir = File.join(@root_path_default, 'myenv')
+      prepopulate_key_files(default_env_root_dir, keydir)
 
       is_expected.to run.with_params(keydir, options).and_return(key_list)
     end

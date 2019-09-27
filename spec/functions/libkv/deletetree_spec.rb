@@ -47,11 +47,11 @@ describe 'libkv::deletetree' do
   # specified and then verify options merging when libkv::options is specified.
 
   context 'without libkv::options' do
-    let(:test_file_keydir) { File.join(@root_path_test_file, 'production') }
-    let(:default_keydir) { File.join(@root_path_default, 'production') }
+    let(:test_file_env_root_dir) { File.join(@root_path_test_file, 'production') }
+    let(:default_env_root_dir) { File.join(@root_path_default, 'production') }
 
     it 'should delete an existing, non-empty key folder in a specific backend in options' do
-      actual_keydir = File.join(test_file_keydir, keydir)
+      actual_keydir = File.join(test_file_env_root_dir, keydir)
       FileUtils.mkdir_p(actual_keydir)
       key_file = File.join(actual_keydir, 'key')
       FileUtils.touch(key_file)
@@ -61,7 +61,7 @@ describe 'libkv::deletetree' do
     end
 
     it 'should delete an existing key folder in the default backend in options' do
-      actual_keydir = File.join(default_keydir, keydir)
+      actual_keydir = File.join(default_env_root_dir, keydir)
       FileUtils.mkdir_p(actual_keydir)
       key_file = File.join(actual_keydir, 'key')
       FileUtils.touch(key_file)
@@ -71,7 +71,7 @@ describe 'libkv::deletetree' do
     end
 
     it 'should delete an existing empty key folder in a specific backend in options' do
-      actual_keydir = File.join(test_file_keydir, keydir)
+      actual_keydir = File.join(test_file_env_root_dir, keydir)
       FileUtils.mkdir_p(actual_keydir)
 
       is_expected.to run.with_params(keydir, @options_test_file).and_return(true)
