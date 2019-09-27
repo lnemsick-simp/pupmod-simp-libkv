@@ -1,20 +1,21 @@
 {
-  "name": "simp-libkv",
-  "version": "0.7.0",
+  "name": "simp-libkv_test",
+  "version": "1.0.0",
   "author": "simp",
-  "summary": "LibKV providers",
+  "summary": "test manifests for libkv plugin testing",
   "license": "Apache-2.0",
   "source": "https://github.com/simp/pupmod-simp-libkv",
   "project_page": "https://github.com/simp/pupmod-simp-libkv",
   "issues_url": "https://simp-project.atlassian.net",
-  "tags": [
-    "simp",
-    "libkv"
-  ],
+  "tags": [],
   "dependencies": [
     {
-      "name": "puppetlabs/stdlib",
-      "version_requirement": ">= 4.9.0 < 7.0.0"
+      "name": "simp/libkv",
+      "version_requirement": ">= 0.7.0"
+    },
+    {
+      "name": "simp/simplib",
+      "version_requirement": ">= 4.0.0 < 5.0.0"
     }
   ],
   "operatingsystem_support": [

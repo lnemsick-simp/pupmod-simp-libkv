@@ -8,5 +8,6 @@ fixtures:
     # of the global parts.
     compliance_markup: https://github.com/simp/pupmod-simp-compliance_markup
   symlinks:
-    libkv: "#{source_dir}"
+    libkv:        "#{source_dir}"
     test_plugins: "#{File.join(source_dir, 'spec', 'support', 'modules', 'test_plugins')}"
+    libkv_test:   "#{File.join(source_dir, 'spec', 'support', 'modules', 'libkv_test')}"

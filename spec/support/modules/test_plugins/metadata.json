@@ -2,7 +2,7 @@
   "name": "simp-test_plugins",
   "version": "9.9.9",
   "author": "simp",
-  "summary": "plugins for libkv error testing"
+  "summary": "plugins for libkv error testing",
   "license": "Apache-2.0",
   "source": "https://github.com/simp/pupmod-simp-libkv",
   "project_page": "https://github.com/simp/pupmod-simp-libkv",

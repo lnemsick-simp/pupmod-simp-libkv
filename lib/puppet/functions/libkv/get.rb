@@ -3,7 +3,7 @@
 #
 # @author https://github.com/simp/pupmod-simp-libkv/graphs/contributors
 #
-Puppet::Functions.create_function(:'libkv::get') do
+Puppet::Functions.create_function(:'libkv::get', Puppet::Functions::InternalFunction) do
 
   # @param key The key to retrieve
   # @param options Hash that specifies global libkv options and/or the specific
@@ -63,11 +63,12 @@ Puppet::Functions.create_function(:'libkv::get') do
   #     the key
   #
   dispatch :get do
+    scope_param()
     required_param 'String[1]', :key
     optional_param 'Hash',      :options
   end
 
-  def get(key, options={})
+  def get(scope, key, options={})
     # key validation difficult to do via a type alias, so validate via function
     call_function('libkv::validate_key', key)
 
@@ -77,7 +78,7 @@ Puppet::Functions.create_function(:'libkv::get') do
     # determine backend configuration using options, `libkv::options`,
     # and the list of backends for which plugins have been loaded
     begin
-      calling_resource = call_function('simplib::debug::classtrace', false).last
+      calling_resource = get_calling_resource(scope)
       catalog = closure_scope.find_global_scope.catalog
       merged_options = call_function( 'libkv::get_backend_config',
         options, catalog.libkv.backends, calling_resource)
@@ -106,4 +107,24 @@ Puppet::Functions.create_function(:'libkv::get') do
 
     result
   end
+
+  # TODO Move this into a common function in PuppetX namespace with environment-safe
+  # protections.  The parameter is a Puppet::Parser::Scope, which is not a Puppet Type.
+  # So, can't use regular Puppet 4 API Ruby function.
+  def get_calling_resource(callers_scope)
+    calling_resource = 'Class[main]'
+    current_scope = callers_scope
+    found = false
+    while !found
+      scope_s = current_scope.to_s
+      if scope_s.start_with?('Scope(')
+        calling_resource = scope_s.split('Scope(').last[0..-2]
+        found = true
+      end
+      found = true if current_scope.is_topscope?
+      current_scope = current_scope.parent
+    end
+    calling_resource
+  end
+ 
 end
