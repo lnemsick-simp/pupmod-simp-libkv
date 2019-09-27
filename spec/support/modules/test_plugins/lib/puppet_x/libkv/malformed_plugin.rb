@@ -1,8 +1,7 @@
-# Copy this file to <plugin name>_plugin.rb and address the FIXMEs
-#
+# Bad libkv plugin with malformed Ruby code
 
 # Each plugin **MUST** be an anonymous class accessible only through
 # a `plugin_class` local variable.
 plugin_class = Class.new do
 
-# OOPS - malformed Ruby....missing 'end'
+# OOPS....missing 'end'
