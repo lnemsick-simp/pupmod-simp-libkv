@@ -53,7 +53,7 @@ simp_libkv_adapter_class = Class.new do
     #
     modules_dir = File.dirname(File.dirname(File.dirname(File.dirname(File.dirname(__FILE__)))))
     plugin_glob = File.join(modules_dir, '*', 'lib', 'puppet_x', 'libkv', '*_plugin.rb')
-    Dir.glob(plugin_glob) do |filename|
+    Dir.glob(plugin_glob).sort.each do |filename|
       # Load plugin code.  Code evaluated will set this local scope variable
       # 'plugin_class' to the anonymous Class object for the plugin
       # contained in the file.
@@ -63,7 +63,13 @@ simp_libkv_adapter_class = Class.new do
       begin
         plugin_class = nil
         self.instance_eval(File.read(filename), filename)
-        @plugin_classes[plugin_class.type] = plugin_class
+        if @plugin_classes.has_key?(plugin_class.type)
+          msg = "Skipping load of libkv plugin from #{filename}: " +
+            "plugin type '#{plugin_class.type}' already loaded"
+          Puppet.warning(msg)
+        else
+          @plugin_classes[plugin_class.type] = plugin_class
+        end
       rescue SyntaxError => e
         Puppet.warning("libkv plugin from #{filename} failed to load: #{e.message}")
       end
