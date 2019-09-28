@@ -79,7 +79,7 @@ Puppet::Functions.create_function(:'libkv::get', Puppet::Functions::InternalFunc
     # and the list of backends for which plugins have been loaded
     begin
       calling_resource = get_calling_resource(scope)
-      catalog = closure_scope.find_global_scope.catalog
+      catalog = scope.find_global_scope.catalog
       merged_options = call_function( 'libkv::get_backend_config',
         options, catalog.libkv.backends, calling_resource)
     rescue ArgumentError => e
@@ -126,5 +126,4 @@ Puppet::Functions.create_function(:'libkv::get', Puppet::Functions::InternalFunc
     end
     calling_resource
   end
- 
 end

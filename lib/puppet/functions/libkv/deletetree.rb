@@ -2,12 +2,7 @@
 #
 # @author https://github.com/simp/pupmod-simp-libkv/graphs/contributors
 #
-Puppet::Functions.create_function(:'libkv::deletetree') do
-
-  dispatch :deletetree do
-    required_param 'String[1]', :keydir
-    optional_param 'Hash',      :options
-  end
+Puppet::Functions.create_function(:'libkv::deletetree', Puppet::Functions::InternalFunction) do
 
   # @param keydir The key folder to be removed
   # @param options Hash that specifies global libkv options and/or the specific
@@ -64,7 +59,13 @@ Puppet::Functions.create_function(:'libkv::deletetree') do
   #   backend operation fails and 'softfail' is `true` in the merged backend
   #   options
   #
-  def deletetree(keydir, options={})
+  dispatch :deletetree do
+    scope_param()
+    required_param 'String[1]', :keydir
+    optional_param 'Hash',      :options
+  end
+
+  def deletetree(scope, keydir, options={})
     # key validation difficult to do via a type alias, so validate via function
     call_function('libkv::validate_key', keydir)
 
@@ -74,8 +75,8 @@ Puppet::Functions.create_function(:'libkv::deletetree') do
     # determine backend configuration using options, `libkv::options`,
     # and the list of backends for which plugins have been loaded
     begin
-      calling_resource = call_function('simplib::debug::classtrace', false).last
-      catalog = closure_scope.find_global_scope.catalog
+      calling_resource = get_calling_resource(scope)
+      catalog = scope.find_global_scope.catalog
       merged_options = call_function( 'libkv::get_backend_config',
         options, catalog.libkv.backends, calling_resource)
     rescue ArgumentError => e
@@ -96,5 +97,24 @@ Puppet::Functions.create_function(:'libkv::deletetree') do
     end
 
     success
+  end
+
+  # TODO Move this into a common function in PuppetX namespace with environment-safe
+  # protections.  The parameter is a Puppet::Parser::Scope, which is not a Puppet Type.
+  # So, can't use regular Puppet 4 API Ruby function.
+  def get_calling_resource(callers_scope)
+    calling_resource = 'Class[main]'
+    current_scope = callers_scope
+    found = false
+    while !found
+      scope_s = current_scope.to_s
+      if scope_s.start_with?('Scope(')
+        calling_resource = scope_s.split('Scope(').last[0..-2]
+        found = true
+      end
+      found = true if current_scope.is_topscope?
+      current_scope = current_scope.parent
+    end
+    calling_resource
   end
 end

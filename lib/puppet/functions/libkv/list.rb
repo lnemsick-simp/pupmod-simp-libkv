@@ -2,8 +2,7 @@
 #
 # @author https://github.com/simp/pupmod-simp-libkv/graphs/contributors
 #
-Puppet::Functions.create_function(:'libkv::list') do
-
+Puppet::Functions.create_function(:'libkv::list', Puppet::Functions::InternalFunction) do
 
   # @param options Hash that specifies global libkv options and/or the specific
   #   backend to use (with or without backend-specific configuration).
@@ -62,12 +61,13 @@ Puppet::Functions.create_function(:'libkv::list') do
   #     key.
   #
   dispatch :list do
+    scope_param()
     required_param 'String[1]', :keydir
     optional_param 'Hash',      :options
   end
 
   # @param keydir The key folder to be removed
-  def list(keydir, options={})
+  def list(scope, keydir, options={})
     # key validation difficult to do via a type alias, so validate via function
     call_function('libkv::validate_key', keydir)
 
@@ -77,7 +77,7 @@ Puppet::Functions.create_function(:'libkv::list') do
     # determine backend configuration using options, `libkv::options`,
     # and the list of backends for which plugins have been loaded
     begin
-      calling_resource = call_function('simplib::debug::classtrace', false).last
+      calling_resource = get_calling_resource(scope)
       catalog = scope.find_global_scope.catalog
       merged_options = call_function( 'libkv::get_backend_config',
         options, catalog.libkv.backends, calling_resource)
@@ -128,5 +128,4 @@ Puppet::Functions.create_function(:'libkv::list') do
     end
     calling_resource
   end
-
 end
