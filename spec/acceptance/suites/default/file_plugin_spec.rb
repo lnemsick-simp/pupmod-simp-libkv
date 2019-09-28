@@ -34,12 +34,12 @@ describe 'libkv file plugin' do
       'environment' => '%{server_facts.environment}',
       'softfail'    => false,
       'backends' => {
-      'default.Class[Libkv_test::Put]'            => "%{alias('libkv::backend::file_class')}",
-      'default.Class[Libkv_test::Exists]'         => "%{alias('libkv::backend::file_class')}",
-      'default.Class[Libkv_test::List]'           => "%{alias('libkv::backend::file_class')}",
-      'default.Class[Libkv_test::Get]'            => "%{alias('libkv::backend::file_class')}",
       'default.Class[Libkv_test::Delete]'         => "%{alias('libkv::backend::file_class')}",
-      'default.Class[Libkv_test::DeleteTree]'     => "%{alias('libkv::backend::file_class')}",
+      'default.Class[Libkv_test::Deletetree]'     => "%{alias('libkv::backend::file_class')}",
+      'default.Class[Libkv_test::Exists]'         => "%{alias('libkv::backend::file_class')}",
+      'default.Class[Libkv_test::Get]'            => "%{alias('libkv::backend::file_class')}",
+      'default.Class[Libkv_test::List]'           => "%{alias('libkv::backend::file_class')}",
+      'default.Class[Libkv_test::Put]'            => "%{alias('libkv::backend::file_class')}",
       'default.Libkv_test::Defines::Put[define2]' => "%{alias('libkv::backend::file_define_instance')}",
       'default.Libkv_test::Defines::Put'          => "%{alias('libkv::backend::file_define_type')}",
       'default'                                   => "%{alias('libkv::backend::file_default')}",
@@ -93,7 +93,7 @@ describe 'libkv file plugin' do
         '/var/simp/libkv/file/class/production/class/int',
         '/var/simp/libkv/file/class/production/class/float',
         '/var/simp/libkv/file/class/production/class/array_strings',
-        '/var/simp/libkv/file/class/production/class/array_integers'
+        '/var/simp/libkv/file/class/production/class/array_integers',
         '/var/simp/libkv/file/class/production/class/hash',
 
         '/var/simp/libkv/file/class/production/class/bool_with_meta',
@@ -111,11 +111,11 @@ describe 'libkv file plugin' do
         '/var/simp/libkv/file/define_instance/production/define/define2/string',
         '/var/simp/libkv/file/define_instance/production/define/define2/string_from_rfunction',
         '/var/simp/libkv/file/define_type/production/define/define1/string',
-        '/var/simp/libkv/file/define_type/production/define/define1/string_from_rfunction',
+        '/var/simp/libkv/file/define_type/production/define/define1/string_from_rfunction'
       ].each do |file|
         # validation of content will be done in gets test
-        it 'should create #{file} key file' do
-         
+        it "should create #{file}" do
+          expect( file_exists_on(host, file) ).to be true
         end
       end
     end
@@ -124,30 +124,32 @@ describe 'libkv file plugin' do
       let(:manifest) {
         <<-EOS
         # class uses libkv::exists to verify the existence of keys in
-        # the 'file/class' backend; fails compilation if the libkv::exists
-        # result doesn't match what it expects
+        # the 'file/class' backend; fails compilation any libkv::exists
+        # result doesn't match expected
         class { 'libkv_test::exists': }
         EOS
       }
 
-=begin
       it 'manifest should work with no errors' do
         set_hieradata_on(host, hieradata)
         apply_manifest_on(host, manifest, :catch_failures => true)
       end
-=end
     end
-=begin
 
     context 'libkv get operation' do
       let(:manifest) {
         <<-EOS
         # class uses libkv::get to retrieve values with/without metadata for
-        # keys in the 'file/class' backend ; fails compilation if the retrieved
-        # info does match what it expects
+        # keys in the 'file/class' backend; fails compilation if any retrieved
+        # info does match expected
         class { 'libkv_test::get': }
         EOS
       }
+
+      it 'manifest should work with no errors' do
+        set_hieradata_on(host, hieradata)
+        apply_manifest_on(host, manifest, :catch_failures => true)
+      end
 
     end
 
@@ -155,11 +157,16 @@ describe 'libkv file plugin' do
       let(:manifest) {
         <<-EOS
         # class uses libkv::list to retrieve list of keys/values/metadata tuples for
-        # keys in the 'file/class' backend ; fails compilation if the retrieved
-        # info does match what it expects
+        # keys in the 'file/class' backend; fails compilation if the retrieved
+        # info does match expected
         class { 'libkv_test::exists': }
         EOS
       }
+
+      it 'manifest should work with no errors' do
+        set_hieradata_on(host, hieradata)
+        apply_manifest_on(host, manifest, :catch_failures => true)
+      end
 
     end
 
@@ -167,10 +174,33 @@ describe 'libkv file plugin' do
       let(:manifest) {
         <<-EOS
         # class uses libkv::delete to remove a subset of keys in the 'file/class'
-        # backend
+        # backend and the libkv::exists to verify they are gone but the other keys
+        # are still present; fails compilation if any removed keys still exist or
+        # any preserved keys have been removed
         class { 'libkv_test::delete': }
         EOS
       }
+
+      it 'manifest should work with no errors' do
+        set_hieradata_on(host, hieradata)
+        apply_manifest_on(host, manifest, :catch_failures => true)
+      end
+
+      [
+        '/var/simp/libkv/file/class/production/class/bool',
+        '/var/simp/libkv/file/class/production/class/string',
+        #'/var/simp/libkv/file/class/production/class/binary',
+        '/var/simp/libkv/file/class/production/class/int',
+        '/var/simp/libkv/file/class/production/class/float',
+        '/var/simp/libkv/file/class/production/class/array_strings',
+        '/var/simp/libkv/file/class/production/class/array_integers',
+        '/var/simp/libkv/file/class/production/class/hash',
+      ].each do |file|
+        it "should remove #{file}" do
+          expect( file_exists_on(host, file) ).to be false
+        end
+      end
+
 
     end
 
@@ -178,13 +208,21 @@ describe 'libkv file plugin' do
       let(:manifest) {
         <<-EOS
         # class uses libkv::deletetree to remove the remaining keys in the 'file/class'
-        # backend
+        # backend and the libkv::exists to verify all keys are gone; fails compilation
+        # any keys remain
         class { 'libkv_test::deletetree': }
         EOS
       }
 
+      it 'manifest should work with no errors' do
+        set_hieradata_on(host, hieradata)
+        apply_manifest_on(host, manifest, :catch_failures => true)
+      end
+
+      it 'should remove specified folder' do
+        expect( file_exists_on(host, '/var/simp/libkv/file/class/production/class/') ).to be false
+      end
     end
 
   end
-=end
 end

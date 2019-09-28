@@ -179,24 +179,28 @@ plugin_class = Class.new do
     value = nil
     err_msg = nil
     key_file = File.join(@root_path, key)
-    begin
-      Timeout::timeout(@lock_timeout_seconds) do
-        # To ensure all threads are not sharing the same file descriptor
-        # do **NOT** use a File.open block!
-        file = File.open(key_file, 'r')
-        file.flock(File::LOCK_EX)
-        value = file.read
-        file.close # lock released with close
-      end
+    if File.directory?(key_file)
+      err_msg = "libkv plugin #{@name}: Key specifies a folder"
+    else
+      begin
+        Timeout::timeout(@lock_timeout_seconds) do
+          # To ensure all threads are not sharing the same file descriptor
+          # do **NOT** use a File.open block!
+          file = File.open(key_file, 'r')
+          file.flock(File::LOCK_EX)
+          value = file.read
+          file.close # lock released with close
+        end
 
-    # Don't need to specify the key in the error messages below, as the key
-    # will be appended to the message by the originating libkv::get()
-    rescue Errno::ENOENT
-      err_msg = "libkv plugin #{@name}: Key not found"
-    rescue Timeout::Error
-      err_msg = "libkv plugin #{@name}: Timed out waiting for key file lock"
-    rescue Exception => e
-      err_msg = "Key retrieval failed: #{e.message}"
+      # Don't need to specify the key in the error messages below, as the key
+      # will be appended to the message by the originating libkv::get()
+      rescue Errno::ENOENT
+        err_msg = "libkv plugin #{@name}: Key not found"
+      rescue Timeout::Error
+        err_msg = "libkv plugin #{@name}: Timed out waiting for key file lock"
+      rescue Exception => e
+        err_msg = "Key retrieval failed: #{e.message}"
+      end
     end
     { :result => value, :err_msg => err_msg }
   end

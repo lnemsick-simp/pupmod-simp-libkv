@@ -12,33 +12,33 @@ class libkv_test::put(
 
 ) {
 
+  # Do not try to put these in an each block...you will end up with
+  # the default backend because the class resource will be 'Class[main]'
+
+  # Call libkv::put directly - will correctly pick backend
   libkv::put('class/bool', $test_bool)
   libkv::put('class/string', $test_string)
-#  libkv::put('class/binary', $test_binary)
+##  libkv::put('class/binary', $test_binary)
   libkv::put('class/int', $test_integer)
   libkv::put('class/float', $test_float)
   libkv::put('class/array_strings', $test_array_strings)
   libkv::put('class/array_integers', $test_array_integers)
   libkv::put('class/hash', $test_hash)
 
+  # Add keys with metadata
   libkv::put('class/bool_with_meta', $test_bool, $test_meta )
   libkv::put('class/string_with_meta', $test_string, $test_meta)
-#  libkv::put('class/binary_with_meta', $test_binary, $test_meta)
+##  libkv::put('class/binary_with_meta', $test_binary, $test_meta)
   libkv::put('class/int_with_meta', $test_integer, $test_meta)
   libkv::put('class/float_with_meta', $test_float, $test_meta)
   libkv::put('class/array_strings_with_meta', $test_array_strings, $test_meta)
   libkv::put('class/array_integers_with_meta', $test_array_integers, $test_meta)
   libkv::put('class/hash_with_meta', $test_hash, $test_meta)
 
+  # Call libkv::put via a Puppet Ruby function - will correctly pick backend
+  libkv_test::put_rwrapper('class/bool_from_rfunction', $test_bool)
 
-
-  libkv_test::defines::put { 'define1': }
-  libkv_test::defines::put { 'define2': }
-
-  $_class_keys = libkv::list('class')
-  $_define1_keys = libkv::list('define/define1')
-  $_define2_keys = libkv::list('define/define2')
-  simplib::inspect('_class_keys')
-  simplib::inspect('_define1_keys')
-  simplib::inspect('_define2_keys')
+  # Call libkv::put via a Puppet language function - will use default backend
+  # instead of correct backend
+  libkv_test::put_pwrapper('class/bool_from_pfunction', $test_bool)
 }
