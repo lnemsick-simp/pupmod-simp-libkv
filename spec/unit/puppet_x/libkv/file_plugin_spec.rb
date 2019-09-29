@@ -333,6 +333,15 @@ describe 'libkv file plugin anonymous class' do
         expect( result[:err_msg] ).to be_nil
       end
 
+      it 'should return :unset result and an :err_msg when the key is a dir not a file' do
+        keydir = 'keydir'
+        FileUtils.mkdir_p(File.join(@root_path, keydir))
+        result = @plugin.get(keydir)
+        expect( result[:result] ).to be_nil
+        expect( result[:err_msg] ).to match(/Key specifies a folder/)
+      end
+
+
       it 'should return an unset :result and an :err_msg when the key file does not exist' do
         result = @plugin.get('does/not/exist/key')
         expect( result[:result] ).to be_nil
