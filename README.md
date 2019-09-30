@@ -147,7 +147,9 @@ with libkv's file plugin:
 
 Each plugin (store interface) is written in pure Ruby and, to prevent
 cross-environment contamination, is implemented as an anonymous class
-automatically loaded by the libkv adapter with each Puppet compile.
+that is automatically loaded by the libkv adapter with each Puppet compile.
+You do not have to do anything special to have your plugin loaded, provided
+you follow the instructions in the next section.
 
 ### Implementing the Store Interface API
 
