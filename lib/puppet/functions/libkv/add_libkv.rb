@@ -4,6 +4,7 @@
 #
 Puppet::Functions.create_function(:'libkv::add_libkv') do
 
+  # @return [Nil]
   # @raise LoadError if libkv adapter software fails to load
   #
   dispatch :add_libkv do

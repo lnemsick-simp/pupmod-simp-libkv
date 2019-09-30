@@ -51,13 +51,6 @@ describe 'libkv file plugin' do
 
   hosts.each do |host|
 
-    context 'prep' do
-      it 'should create a binary file for test' do
-        on(host, 'mkdir /root/binary_data')
-        on(host, 'dd count=1 if=/dev/urandom of=/root/binary_data/data1')
-      end
-    end
-
     context 'libkv put operation' do
       let(:manifest) {
          <<-EOS
@@ -67,7 +60,8 @@ describe 'libkv file plugin' do
 
       # Calls libkv::put directly and via both a Puppet-language function
       # and a Ruby-language function
-      # * Stores values of different types
+      # * Stores values of different types.  Binary content is handled
+      #   via a separate test.
       #   Ruby-language function, libkv_test::put_rwrapper, should go to the
       #   correct backend instance, 'file/class'.  libkv_test::put_rwrapper
       #   works properly because it is written in a way to access full scope.
@@ -94,26 +88,24 @@ describe 'libkv file plugin' do
       end
 
       [
-        '/var/simp/libkv/file/class/production/from_class/bool',
+        '/var/simp/libkv/file/class/production/from_class/boolean',
         '/var/simp/libkv/file/class/production/from_class/string',
-        '/var/simp/libkv/file/class/production/from_class/binary',
-        '/var/simp/libkv/file/class/production/from_class/int',
+        '/var/simp/libkv/file/class/production/from_class/integer',
         '/var/simp/libkv/file/class/production/from_class/float',
         '/var/simp/libkv/file/class/production/from_class/array_strings',
         '/var/simp/libkv/file/class/production/from_class/array_integers',
         '/var/simp/libkv/file/class/production/from_class/hash',
 
-        '/var/simp/libkv/file/class/production/from_class/bool_with_meta',
+        '/var/simp/libkv/file/class/production/from_class/boolean_with_meta',
         '/var/simp/libkv/file/class/production/from_class/string_with_meta',
-        '/var/simp/libkv/file/class/production/from_class/binary_with_meta',
-        '/var/simp/libkv/file/class/production/from_class/int_with_meta',
+        '/var/simp/libkv/file/class/production/from_class/integer_with_meta',
         '/var/simp/libkv/file/class/production/from_class/float_with_meta',
         '/var/simp/libkv/file/class/production/from_class/array_strings_with_meta',
         '/var/simp/libkv/file/class/production/from_class/array_integers_with_meta',
         '/var/simp/libkv/file/class/production/from_class/hash_with_meta',
 
-        '/var/simp/libkv/file/class/production/class/bool_from_rfunction',
-        '/var/simp/libkv/file/default/production/class/bool_from_pfunction',
+        '/var/simp/libkv/file/class/production/from_class/boolean_from_rfunction',
+        '/var/simp/libkv/file/default/production/from_class/boolean_from_pfunction',
 
         '/var/simp/libkv/file/define_instance/production/from_define/define2/string',
         '/var/simp/libkv/file/define_instance/production/from_define/define2/string_from_rfunction',
@@ -138,7 +130,6 @@ describe 'libkv file plugin' do
       }
 
       it 'manifest should work with no errors' do
-        set_hieradata_on(host, hieradata)
         apply_manifest_on(host, manifest, :catch_failures => true)
       end
     end
@@ -147,34 +138,29 @@ describe 'libkv file plugin' do
       let(:manifest) {
         <<-EOS
         # class uses libkv::get to retrieve values with/without metadata for
-        # keys in the 'file/class' backend; fails compilation if any retrieved
-        # info does match expected
+        # keys in the 'file/class' backend; fails compilation if any
+        # retrieved info does match expected
         class { 'libkv_test::get': }
         EOS
       }
 
       it 'manifest should work with no errors' do
-        set_hieradata_on(host, hieradata)
         apply_manifest_on(host, manifest, :catch_failures => true)
       end
-
-     it 'should create binary file that matches input binary file' do
-     end
 
     end
 
     context 'libkv list operation' do
       let(:manifest) {
         <<-EOS
-        # class uses libkv::list to retrieve list of keys/values/metadata tuples for
-        # keys in the 'file/class' backend; fails compilation if the retrieved
-        # info does match expected
+        # class uses libkv::list to retrieve list of keys/values/metadata tuples
+        # for keys in the 'file/class' backend; fails compilation if the
+        # retrieved info does match expected
         class { 'libkv_test::exists': }
         EOS
       }
 
       it 'manifest should work with no errors' do
-        set_hieradata_on(host, hieradata)
         apply_manifest_on(host, manifest, :catch_failures => true)
       end
 
@@ -192,15 +178,13 @@ describe 'libkv file plugin' do
       }
 
       it 'manifest should work with no errors' do
-        set_hieradata_on(host, hieradata)
         apply_manifest_on(host, manifest, :catch_failures => true)
       end
 
       [
-        '/var/simp/libkv/file/class/production/from_class/bool',
+        '/var/simp/libkv/file/class/production/from_class/boolean',
         '/var/simp/libkv/file/class/production/from_class/string',
-        '/var/simp/libkv/file/class/production/from_class/binary',
-        '/var/simp/libkv/file/class/production/from_class/int',
+        '/var/simp/libkv/file/class/production/from_class/integer',
         '/var/simp/libkv/file/class/production/from_class/float',
         '/var/simp/libkv/file/class/production/from_class/array_strings',
         '/var/simp/libkv/file/class/production/from_class/array_integers',
@@ -225,12 +209,67 @@ describe 'libkv file plugin' do
       }
 
       it 'manifest should work with no errors' do
-        set_hieradata_on(host, hieradata)
         apply_manifest_on(host, manifest, :catch_failures => true)
       end
 
       it 'should remove specified folder' do
         expect( file_exists_on(host, '/var/simp/libkv/file/class/production/from_class/') ).to be false
+      end
+    end
+
+    context 'libkv operations for binary data' do
+      context 'prep' do
+        it 'should create a binary file for test' do
+          on(host, 'mkdir /root/binary_data')
+          on(host, 'dd count=1 if=/dev/urandom of=/root/binary_data/input_data')
+        end
+      end
+
+      context 'libkv put operation for Binary type' do
+        let(:manifest) {
+          <<-EOS
+          # class uses libkv::put to store binary data from binary_file() in
+          # a Binary type
+          class { 'libkv_test::binary_put': }
+          EOS
+        }
+
+        it 'manifest should work with no errors' do
+          apply_manifest_on(host, manifest, :catch_failures => true)
+        end
+
+        [
+          '/var/simp/libkv/file/default/production/from_class/binary',
+          '/var/simp/libkv/file/default/production/from_class/binary_with_meta'
+        ].each do |file|
+          it "should create #{file}" do
+            expect( file_exists_on(host, file) ).to be true
+          end
+        end
+      end
+
+      context 'libkv get operation for Binary type' do
+        let(:manifest) {
+          <<-EOS
+          # class uses libkv::get to retrieve binary data for Binary type variables
+          # and to persist new files with binary content; fails compilation if any
+          # retrieved info does match expected
+          class { 'libkv_test::binary_get': }
+          EOS
+        }
+
+        it 'manifest should work with no errors' do
+          apply_manifest_on(host, manifest, :catch_failures => true)
+        end
+
+        {
+          'retrieved_data1' => 'retrieved from key without metadata',
+          'retrieved_data2' => 'retrieved from key with metadata'
+        }.each do |output_file,summary|
+          it "should create binary file #{summary} that matches input binary file" do
+            on(host, "diff /root/binary_data/input_data /root/binary_data/#{output_file}")
+          end
+        end
       end
     end
 

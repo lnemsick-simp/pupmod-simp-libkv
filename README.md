@@ -6,9 +6,24 @@
 
 #### Table of Contents
 
-1. [Description](#description)
+<!-- vim-markdown-toc -->
+
+* [Overview](#overview)
+* [This is a SIMP module](#this-is-a-simp-module)
+* [Module Description](#module-description)
+* [Setup](#setup)
+  * [What libkv affects](#what-libk-affects)
+* [Usage](#usage)
+* [Limitations](#limitations)
+* [Development](#development)
+  * [Plugin Development](#plugin-development)
+  * [Unit tests](#unit-tests)
+  * [Acceptance tests](#acceptance-tests)
+
+<!-- vim-markdown-toc GFM -->
+
 2. [Usage - Configuration options and additional functionality](#usage)
-3. [Testing](#testing)
+3. [Plugin Development](#plugin-development)
 4. [Function Reference](#function-reference)
 
     * [libkv::get](#get)
@@ -32,10 +47,54 @@
 
     * [Acceptance Tests - Beaker env variables](#acceptance-tests)
 
-## Description
+## Overview
 
-libkv is an abstract library that allows puppet to access a distributed key
-value store, like consul or etcd. This library implements all the basic
+## This is a SIMP module
+
+This module is a component of the [System Integrity Management Platform](https://simp-project.com)
+
+If you find any issues, please submit them via [JIRA](https://simp-project.atlassian.net/).
+
+Please read our [Contribution Guide] (https://simp.readthedocs.io/en/stable/contributors_guide/index.html).
+
+
+## Module Description
+
+Provides and abstract library that allows Puppet to access one or more key/value
+stores.
+
+This module provides
+
+* a standard Puppet language API (functions) for using key/value stores
+
+  * See [REFERENCE.md](REFERENCE.md) for more details on the available
+    functions.
+
+* a configuration scheme that allows users to specify per-application use
+  of different key/value store instances
+* adapter software that loads and uses store-specific interface software
+  provided by the libkv module itself or other modules
+* a Ruby API for the store interface software that developers can implement
+  to provide their own store interface
+* a file-based store on the local filesystem and its interface software.
+
+  * Future versions of this module will provide a distributed key/value store.
+
+
+## Set up
+
+### Terminolog
+
+* backend - A specific key/value store, e.g., Consul, Etcd, Zookeeper, local
+  files
+* plugin - Ruby software that interfaces with a specific backend to
+  affect the operations requested in libkv functions.
+* plugin adapter - Ruby software that loads, selects, and executes the
+  appropriate plugin software for a libkv function call.
+
+### Configuration
+
+, like consul or etcd. This library implements all the basic
 key/value primitives, get, put, list, delete. It also exposes any 'check and
 set' functionality the underlying store supports. This allows building of safe
 atomic operations, to build complex distributed systems. This library supports
@@ -424,23 +483,81 @@ Return the name of the current provider
 </pre>
 
 
+#####################
+
+
+
+
+## Module Description
+
+Provides a Hiera-friendly interface to GRUB configuration activities.
+
+Currently supports setting administrative GRUB passwords on both GRUB 2 and
+legacy GRUB systems.
+
+See [REFERENCE.md](REFERENCE.md) for more details.
+
+## Setup
+
+### What simp_grub affects
+
+`simp_grub` helps manage the GRUB configuration on your systems.
+
+## Usage
+
+Simply ``include simp_grub`` and set the ``simp_grub::password`` parameter to
+password protect GRUB.
+
+Password entries that do not start with `$1$`, `$5$`, or `$6$` will be encrypted
+for you.
+
+### GRUB2
+
+If your system supports GRUB2, you can also set up the administrative username.
+
+Example: Set the admin username:
+
+```yaml
+---
+simp_grub::admin: my_admin_username
+```
+
+## Limitations
+
+SIMP Puppet modules are generally intended to be used on a Red Hat Enterprise
+Linux-compatible distribution such as EL6 and EL7.
+
 ## Development
 
-Please read our [Contribution Guide](https://simp.readthedocs.io/en/stable/contributors_guide/index.html).
+Please read our [Contribution Guide] (https://simp.readthedocs.io/en/stable/contributors_guide/index.html).
+
+### Unit tests
+
+Unit tests, written in ``rspec-puppet`` can be run by calling:
+
+```shell
+bundle exec rake spec
+```
 
 ### Acceptance tests
 
-This module includes [Beaker](https://github.com/puppetlabs/beaker) acceptance
-tests using the SIMP [Beaker Helpers](https://github.com/simp/rubygem-simp-beaker-helpers).
-By default the tests use [Vagrant](https://www.vagrantup.com/) with
-[VirtualBox](https://www.virtualbox.org) as a back-end; Vagrant and VirtualBox
-must both be installed to run these tests without modification. To execute the
-tests run the following:
+To run the system tests, you need [Vagrant](https://www.vagrantup.com/) installed. Then, run:
 
 ```shell
-bundle install
 bundle exec rake beaker:suites
 ```
 
-Please refer to the [SIMP Beaker Helpers documentation](https://github.com/simp/rubygem-simp-beaker-helpers/blob/master/README.md)
-for more information.
+Some environment variables may be useful:
+
+```shell
+BEAKER_debug=true
+BEAKER_provision=no
+BEAKER_destroy=no
+BEAKER_use_fixtures_dir_for_modules=yes
+```
+
+* `BEAKER_debug`: show the commands being run on the STU and their output.
+* `BEAKER_destroy=no`: prevent the machine destruction after the tests finish so you can inspect the state.
+* `BEAKER_provision=no`: prevent the machine from being recreated. This can save a lot of time while you're writing the tests.
+* `BEAKER_use_fixtures_dir_for_modules=yes`: cause all module dependencies to be loaded from the `spec/fixtures/modules` directory, based on the contents of `.fixtures.yml`.  The contents of this directory are usually populated by `bundle exec rake spec_prep`.  This can be used to run acceptance tests to run on isolated networks.
+

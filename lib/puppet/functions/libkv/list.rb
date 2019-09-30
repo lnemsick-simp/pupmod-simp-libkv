@@ -4,6 +4,7 @@
 #
 Puppet::Functions.create_function(:'libkv::list', Puppet::Functions::InternalFunction) do
 
+  # @param keydir The key folder to be removed
   # @param options Hash that specifies global libkv options and/or the specific
   #   backend to use (with or without backend-specific configuration).
   #   Will be merged with `libkv::options`.
@@ -66,7 +67,6 @@ Puppet::Functions.create_function(:'libkv::list', Puppet::Functions::InternalFun
     optional_param 'Hash',      :options
   end
 
-  # @param keydir The key folder to be removed
   def list(scope, keydir, options={})
     # key validation difficult to do via a type alias, so validate via function
     call_function('libkv::validate_key', keydir)

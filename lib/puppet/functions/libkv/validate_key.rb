@@ -15,6 +15,7 @@ Puppet::Functions.create_function(:'libkv::validate_key') do
 
   # @param key libkv key
   #
+  # @return [Nil]
   # @raise [ArgumentError] if validation fails
   #
   # @example Passing

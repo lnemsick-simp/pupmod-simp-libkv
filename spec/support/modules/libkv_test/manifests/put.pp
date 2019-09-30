@@ -1,7 +1,6 @@
 class libkv_test::put(
   Boolean        $test_bool           = true,
   String         $test_string         = 'string1',
-  Binary         $test_binary         = binary_file('/root/binary_data/data1'),
   Integer        $test_integer        = 123,
   Float          $test_float          = 4.567,
   Array          $test_array_strings  = ['string2', 'string3' ],
@@ -16,29 +15,27 @@ class libkv_test::put(
   # the default backend because the class resource will be 'Class[main]'
 
   # Call libkv::put directly - will correctly pick backend
-  libkv::put('from_class/bool', $test_bool)
+  libkv::put('from_class/boolean', $test_bool)
   libkv::put('from_class/string', $test_string)
-  libkv::put('from_class/binary', $test_binary)
-  libkv::put('from_class/int', $test_integer)
+  libkv::put('from_class/integer', $test_integer)
   libkv::put('from_class/float', $test_float)
   libkv::put('from_class/array_strings', $test_array_strings)
   libkv::put('from_class/array_integers', $test_array_integers)
   libkv::put('from_class/hash', $test_hash)
 
   # Add keys with metadata
-  libkv::put('from_class/bool_with_meta', $test_bool, $test_meta )
+  libkv::put('from_class/boolean_with_meta', $test_bool, $test_meta )
   libkv::put('from_class/string_with_meta', $test_string, $test_meta)
-  libkv::put('from_class/binary_with_meta', $test_binary, $test_meta)
-  libkv::put('from_class/int_with_meta', $test_integer, $test_meta)
+  libkv::put('from_class/integer_with_meta', $test_integer, $test_meta)
   libkv::put('from_class/float_with_meta', $test_float, $test_meta)
   libkv::put('from_class/array_strings_with_meta', $test_array_strings, $test_meta)
   libkv::put('from_class/array_integers_with_meta', $test_array_integers, $test_meta)
   libkv::put('from_class/hash_with_meta', $test_hash, $test_meta)
 
   # Call libkv::put via a Puppet Ruby function - will correctly pick backend
-  libkv_test::put_rwrapper('from_class/bool_from_rfunction', $test_bool)
+  libkv_test::put_rwrapper('from_class/boolean_from_rfunction', $test_bool)
 
   # Call libkv::put via a Puppet language function - will use default backend
   # instead of correct backend
-  libkv_test::put_pwrapper('from_class/bool_from_pfunction', $test_bool)
+  libkv_test::put_pwrapper('from_class/boolean_from_pfunction', $test_bool)
 }

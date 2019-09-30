@@ -9,6 +9,7 @@ Puppet::Functions.create_function(:'libkv::validate_backend_config') do
   # @param backends List of backends for which plugins have been successfully
   #   loaded.
   #
+  # @return [Nil]
   # @raise [ArgumentError] if a backend has not been specified, appropriate
   #   configuration for a specified backend cannot be found, or different
   #   backend configurations are provided for the same ['type', 'id'] pair.

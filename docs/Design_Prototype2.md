@@ -35,10 +35,13 @@
 * libkv - SIMP module that provides
 
   * a standard Puppet language API (functions) for using key/value stores
+  * a configuration scheme that allows users to specify per-application use
+    of different key/value store instances
   * adapter software that loads and uses store-specific interface software
-  * a Ruby API for the store interface software
-  * interface software to a few specific stores (file-based store to start)
-  * a file-based store
+    provided by the libkv module itself or other modules
+  * a Ruby API for the store interface software that developers can implement
+    to provide their own store interface
+  * a file-based store on the local filesystem and its interface software
 
 * backend - A specific key/value store, e.g., Consul, Etcd, Zookeeper, local
   files

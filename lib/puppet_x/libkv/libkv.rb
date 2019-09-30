@@ -475,6 +475,7 @@ simp_libkv_adapter_class = Class.new do
     if (normalized_value.encoding == Encoding::UTF_8) &&
        !normalized_value.valid_encoding?
       # this was a user error...on decoding, the encoding error will be fixed
+      # TODO Should we fail instead and tell the user to use a Binary type?
       normalized_value.force_encoding('ASCII-8BIT')
     end
 
