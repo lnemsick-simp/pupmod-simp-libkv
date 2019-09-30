@@ -448,6 +448,9 @@ simp_libkv_adapter_class = Class.new do
     encapsulation = nil
     if value.is_a?(String)
       encapsulation = serialize_string_value(value, metadata)
+    elsif value.respond_to?(:binary_buffer)
+      # This is a Puppet Binary type
+      encapsulation = serialize_binary_data(value.binary_buffer, metadata)
     else
       encapsulation = { 'value' => value, 'metadata' => metadata }
     end
@@ -455,6 +458,16 @@ simp_libkv_adapter_class = Class.new do
     # any element that cannot be serialized to JSON.  Caller catches
     # error and reports failure.
     encapsulation.to_json
+  end
+
+  def serialize_binary_data(value, metadata)
+    encoded_value = Base64.strict_encode64(value)
+    encapsulation = {
+      'value'             =>  encoded_value,
+      'encoding'          => 'base64',
+      'original_encoding' => 'ASCII-8BIT',
+      'metadata'          => metadata
+    }
   end
 
   def serialize_string_value(value, metadata)
@@ -467,13 +480,7 @@ simp_libkv_adapter_class = Class.new do
 
     encapsulation = nil
     if normalized_value.encoding == Encoding::ASCII_8BIT
-      encoded_value = Base64.strict_encode64(normalized_value)
-      encapsulation = {
-        'value' => encoded_value,
-        'encoding' => 'base64',
-        'original_encoding' => 'ASCII-8BIT',
-        'metadata' => metadata
-      }
+      encapsulation = serialize_binary_data(normalized_value, metadata)
     else
       encapsulation = { 'value' => normalized_value, 'metadata' => metadata }
     end

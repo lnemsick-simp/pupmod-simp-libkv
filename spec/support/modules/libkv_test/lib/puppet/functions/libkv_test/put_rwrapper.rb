@@ -7,14 +7,14 @@
 #
 Puppet::Functions.create_function(:'libkv_test::put_rwrapper', Puppet::Functions::InternalFunction) do
 
- 
+
   # @param key The key to be set
   # @param value The value of the key
   # @param metadata Additional information to be persisted
   # @param options Hash that specifies global libkv options and/or the specific
   #   backend to use (with or without backend-specific configuration).
   #   Will be merged with `libkv::options`.
-  # ... 
+  # ...
   #
   dispatch :put_rwrapper do
     scope_param()

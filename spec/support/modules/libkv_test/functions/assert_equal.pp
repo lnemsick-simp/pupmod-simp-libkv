@@ -5,7 +5,7 @@ function libkv_test::assert_equal(
 ) {
 
   info("Checking results for ${message}")
-  
+
   if ($actual != $expected) {
     fail("Expected '${expected}'; got '${actual}' for ${message}")
   }

@@ -51,6 +51,13 @@ describe 'libkv file plugin' do
 
   hosts.each do |host|
 
+    context 'prep' do
+      it 'should create a binary file for test' do
+        on(host, 'mkdir /root/binary_data')
+        on(host, 'dd count=1 if=/dev/urandom of=/root/binary_data/data1')
+      end
+    end
+
     context 'libkv put operation' do
       let(:manifest) {
          <<-EOS
@@ -87,33 +94,33 @@ describe 'libkv file plugin' do
       end
 
       [
-        '/var/simp/libkv/file/class/production/class/bool',
-        '/var/simp/libkv/file/class/production/class/string',
-        #'/var/simp/libkv/file/class/production/class/binary',
-        '/var/simp/libkv/file/class/production/class/int',
-        '/var/simp/libkv/file/class/production/class/float',
-        '/var/simp/libkv/file/class/production/class/array_strings',
-        '/var/simp/libkv/file/class/production/class/array_integers',
-        '/var/simp/libkv/file/class/production/class/hash',
+        '/var/simp/libkv/file/class/production/from_class/bool',
+        '/var/simp/libkv/file/class/production/from_class/string',
+        '/var/simp/libkv/file/class/production/from_class/binary',
+        '/var/simp/libkv/file/class/production/from_class/int',
+        '/var/simp/libkv/file/class/production/from_class/float',
+        '/var/simp/libkv/file/class/production/from_class/array_strings',
+        '/var/simp/libkv/file/class/production/from_class/array_integers',
+        '/var/simp/libkv/file/class/production/from_class/hash',
 
-        '/var/simp/libkv/file/class/production/class/bool_with_meta',
-        '/var/simp/libkv/file/class/production/class/string_with_meta',
-        #'/var/simp/libkv/file/class/production/class/binary_with_meta',
-        '/var/simp/libkv/file/class/production/class/int_with_meta',
-        '/var/simp/libkv/file/class/production/class/float_with_meta',
-        '/var/simp/libkv/file/class/production/class/array_strings_with_meta',
-        '/var/simp/libkv/file/class/production/class/array_integers_with_meta',
-        '/var/simp/libkv/file/class/production/class/hash_with_meta',
+        '/var/simp/libkv/file/class/production/from_class/bool_with_meta',
+        '/var/simp/libkv/file/class/production/from_class/string_with_meta',
+        '/var/simp/libkv/file/class/production/from_class/binary_with_meta',
+        '/var/simp/libkv/file/class/production/from_class/int_with_meta',
+        '/var/simp/libkv/file/class/production/from_class/float_with_meta',
+        '/var/simp/libkv/file/class/production/from_class/array_strings_with_meta',
+        '/var/simp/libkv/file/class/production/from_class/array_integers_with_meta',
+        '/var/simp/libkv/file/class/production/from_class/hash_with_meta',
 
         '/var/simp/libkv/file/class/production/class/bool_from_rfunction',
         '/var/simp/libkv/file/default/production/class/bool_from_pfunction',
 
-        '/var/simp/libkv/file/define_instance/production/define/define2/string',
-        '/var/simp/libkv/file/define_instance/production/define/define2/string_from_rfunction',
-        '/var/simp/libkv/file/define_type/production/define/define1/string',
-        '/var/simp/libkv/file/define_type/production/define/define1/string_from_rfunction'
+        '/var/simp/libkv/file/define_instance/production/from_define/define2/string',
+        '/var/simp/libkv/file/define_instance/production/from_define/define2/string_from_rfunction',
+        '/var/simp/libkv/file/define_type/production/from_define/define1/string',
+        '/var/simp/libkv/file/define_type/production/from_define/define1/string_from_rfunction'
       ].each do |file|
-        # validation of content will be done in gets test
+        # validation of content will be done in 'get' test
         it "should create #{file}" do
           expect( file_exists_on(host, file) ).to be true
         end
@@ -124,7 +131,7 @@ describe 'libkv file plugin' do
       let(:manifest) {
         <<-EOS
         # class uses libkv::exists to verify the existence of keys in
-        # the 'file/class' backend; fails compilation any libkv::exists
+        # the 'file/class' backend; fails compilation if any libkv::exists
         # result doesn't match expected
         class { 'libkv_test::exists': }
         EOS
@@ -150,6 +157,9 @@ describe 'libkv file plugin' do
         set_hieradata_on(host, hieradata)
         apply_manifest_on(host, manifest, :catch_failures => true)
       end
+
+     it 'should create binary file that matches input binary file' do
+     end
 
     end
 
@@ -187,14 +197,14 @@ describe 'libkv file plugin' do
       end
 
       [
-        '/var/simp/libkv/file/class/production/class/bool',
-        '/var/simp/libkv/file/class/production/class/string',
-        #'/var/simp/libkv/file/class/production/class/binary',
-        '/var/simp/libkv/file/class/production/class/int',
-        '/var/simp/libkv/file/class/production/class/float',
-        '/var/simp/libkv/file/class/production/class/array_strings',
-        '/var/simp/libkv/file/class/production/class/array_integers',
-        '/var/simp/libkv/file/class/production/class/hash',
+        '/var/simp/libkv/file/class/production/from_class/bool',
+        '/var/simp/libkv/file/class/production/from_class/string',
+        '/var/simp/libkv/file/class/production/from_class/binary',
+        '/var/simp/libkv/file/class/production/from_class/int',
+        '/var/simp/libkv/file/class/production/from_class/float',
+        '/var/simp/libkv/file/class/production/from_class/array_strings',
+        '/var/simp/libkv/file/class/production/from_class/array_integers',
+        '/var/simp/libkv/file/class/production/from_class/hash',
       ].each do |file|
         it "should remove #{file}" do
           expect( file_exists_on(host, file) ).to be false
@@ -209,7 +219,7 @@ describe 'libkv file plugin' do
         <<-EOS
         # class uses libkv::deletetree to remove the remaining keys in the 'file/class'
         # backend and the libkv::exists to verify all keys are gone; fails compilation
-        # any keys remain
+        # if any keys remain
         class { 'libkv_test::deletetree': }
         EOS
       }
@@ -220,7 +230,7 @@ describe 'libkv file plugin' do
       end
 
       it 'should remove specified folder' do
-        expect( file_exists_on(host, '/var/simp/libkv/file/class/production/class/') ).to be false
+        expect( file_exists_on(host, '/var/simp/libkv/file/class/production/from_class/') ).to be false
       end
     end
 

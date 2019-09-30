@@ -151,8 +151,9 @@ libkv must provide a backend plugin adapter that
   * It must continue to operate with valid plugins, when a malformed plugin
     fails to load.
 
-* The plugin adapter must allow multiple instances of an individual
-  plugin to be instantiated and used during the catalog compile.
+* The plugin adapter must allow multiple but instances of an individual
+  plugin to be instantiated and used during the catalog compile, when the
+  instances have different configuration parameters.
 
 #### Backend Plugin API
 
@@ -505,6 +506,8 @@ is specified.
         # plugin-specific configuration
         root_path: "/var/simp/libkv/file"
         lock_timeout_seconds: 30
+        user: puppet
+        group: puppet
 
 ```
 
@@ -524,11 +527,15 @@ configuration defaults is specified.
     # plugin-specific configuration
     root_path: "/var/simp/libkv/file"
     lock_timeout_seconds: 30
+    user: puppet
+    group: puppet
 
   libkv::backend::alt_file:
     id: alt_file
     type: file
     root_path: "/some/other/path"
+    user: otheruser
+    group: othergroup
 
   libkv::backend::consul:
     id: consul
