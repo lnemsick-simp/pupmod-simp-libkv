@@ -1,6 +1,7 @@
 # Copy this file to <plugin name>_plugin.rb and address the FIXMEs
 #
 
+# DO NOT CHANGE THIS LINE!!!!
 # Each plugin **MUST** be an anonymous class accessible only through
 # a `plugin_class` local variable.
 plugin_class = Class.new do
@@ -16,12 +17,18 @@ plugin_class = Class.new do
     # This is the value that will be in the 'type' attribute of a configuration
     # block for this plugin.  The libkv adapter uses to select the plugin class to
     # use in order to create a plugin instance.
+    # This **MUST** be unique across all loaded plugins.  Only the first
+    # plugin of a particular type will be loaded!
     'FIXME'
   end
 
 
   # Construct an instance of this plugin using global and plugin-specific
   # configuration found in options
+  #
+  # FIXME:  The description below is informational for you as a developer.
+  # Insert the appropriate description of configuration your plugin
+  # supports.
   #
   # The plugin-specific configuration will be found in
   # `options['backends'][ options['backend'] ]`
@@ -84,6 +91,13 @@ plugin_class = Class.new do
   #
   # IMPORTANT NOTES:
   #
+  # - An instance of this plugin class will persist through a single catalog run.
+  # - Other instances of this plugin class may be running concurrently in
+  #   the same process.
+  #
+  #   * Make sure your code is multi-thread safe if you are using any
+  #     mechanisms that would cause concurrency problems!
+  #
   # - All values persisted and returned are Strings.  Other software in the
   #   libkv function chain is responsible for serializing non-String
   #   values into Strings for plugins to persist and then deserializing
@@ -104,6 +118,9 @@ plugin_class = Class.new do
   #         >> Only you have the domain knowledge <<
   #         >> to create useful error messages!   <<
   #
+  # - If your plugin connects to an external service, you are strongly
+  #   encouraged to build retry logic and timeouts into your backend
+  #   operations.
 
   # Deletes a `key` from the configured backend.
   #
