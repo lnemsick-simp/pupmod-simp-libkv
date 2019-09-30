@@ -25,10 +25,14 @@ plugin_class = Class.new do
   # The plugin-specific configuration will be found in
   # `options['backends'][ options['backend'] ]`:
   #
-  # *  `root_path`: root directory path; defaults to '/var/simp/libkv/file'
-  # *  `lock_timeout_seconds`: max seconds to wait for an exclusive file lock
-  #     on a file modifying operation before failing the operation; defaults
-  #     to 20 seconds
+  # * `root_path`: root directory path; defaults to '/var/simp/libkv/file'
+  # * `lock_timeout_seconds`: max seconds to wait for an exclusive file lock
+  #   on a file modifying operation before failing the operation; defaults
+  #   to 20 seconds
+  # * `user`: user for created directories and files; defaults to user
+  #   executing code
+  # * `group`: group for created directories and files; defaults to user
+  #   executing code
   #
   # @param name Name to ascribe to this plugin instance
   # @param options Hash of global libkv and backend-specific options
@@ -68,6 +72,9 @@ plugin_class = Class.new do
       @lock_timeout_seconds = 5
     end
 
+    @user = options['backends'][backend].fetch('user', nil)
+    @group = options['backends'][backend].fetch('group', nil)
+
     unless Dir.exist?(@root_path)
       begin
         FileUtils.mkdir_p(@root_path)
@@ -76,9 +83,10 @@ plugin_class = Class.new do
       end
     end
 
-    # make sure the root directory is protected
+    # set permissions on the root directory
     begin
       FileUtils.chmod(0750, @root_path)
+      FileUtils.chown(@user, @group, @root_path) if @user || @group
     rescue Exception => e
       raise("libkv plugin #{name} Error: Unable to set permissions on #{@root_path}: #{e.message}")
     end
@@ -99,16 +107,21 @@ plugin_class = Class.new do
     success = nil
     err_msg = nil
     key_file = File.join(@root_path, key)
-    begin
-      File.unlink(key_file)
-      success = true
-    rescue Errno::ENOENT
-      # if the key doesn't exist, doesn't need to be deleted...going
-      # to consider this success
-      success = true
-    rescue Exception => e
+    if File.directory?(key_file)
       success = false
-      err_msg = "Delete failed: #{e.message}"
+      err_msg = "libkv plugin #{@name}: Key specifies a folder"
+    else
+      begin
+        File.unlink(key_file)
+        success = true
+      rescue Errno::ENOENT
+        # if the key doesn't exist, doesn't need to be deleted...going
+        # to consider this success
+        success = true
+      rescue Exception => e
+        success = false
+        err_msg = "Delete failed: #{e.message}"
+      end
     end
 
     { :result => success, :err_msg => err_msg }
@@ -256,9 +269,19 @@ plugin_class = Class.new do
   def put(key, value)
     success = nil
     err_msg = nil
-    key_file = File.join(@root_path, key)
-    FileUtils.mkdir_p(File.dirname(key_file), :mode => 0750)
+
     begin
+      # create relative directory for the key file
+      keydir = File.dirname(key)
+      unless keydir == '.'
+        Dir.chdir(@root_path) do
+          FileUtils.mkdir_p(keydir, :mode => 0750)
+          FileUtils.chown_R(@user, @group, keydir) if @user || @group
+        end
+      end
+
+      # create key file
+      key_file = File.join(@root_path, key)
       Timeout::timeout(@lock_timeout_seconds) do
         # To ensure all threads are not sharing the same file descriptor
         # do **NOT** use a File.open block!
@@ -271,6 +294,7 @@ plugin_class = Class.new do
         file.truncate(file.pos)
         file.close # lock released with close
       end
+      FileUtils.chown(@user, @group, key_file) if @user || @group
       success = true
 
     # Don't need to specify the key in the error messages below, as the key

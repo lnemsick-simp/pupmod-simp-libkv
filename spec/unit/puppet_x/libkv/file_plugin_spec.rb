@@ -54,6 +54,28 @@ def locked_key_file_operation(root_path, key, value, &block)
 end
 
 describe 'libkv file plugin anonymous class' do
+  before(:each) do
+    @tmpdir = Dir.mktmpdir
+    @root_path = File.join(@tmpdir, 'libkv', 'file')
+    @options = {
+      'backend'  => 'test',
+      'backends' => {
+        'test'  => {
+          'id'        => 'test',
+          'type'      => 'file',
+          'root_path' => @root_path,
+          'lock_timeout_seconds' => 1
+        }
+      }
+    }
+    allow(FileUtils).to receive(:rm_r).with(any_args).and_call_original
+    allow(File).to receive(:open).with(any_args).and_call_original
+  end
+
+  after(:each) do
+    FileUtils.remove_entry_secure(@tmpdir)
+  end
+
   context 'type' do
     it "class.type should return 'file'" do
       expect(plugin_class.type).to eq 'file'
@@ -62,25 +84,6 @@ describe 'libkv file plugin anonymous class' do
 
   context 'constructor' do
     context 'success cases' do
-      before(:each) do
-        @tmpdir = Dir.mktmpdir
-        @root_path = File.join(@tmpdir, 'libkv', 'file')
-        @options = {
-          'backend'  => 'test',
-          'backends' => {
-            'test'  => {
-              'id'        => 'test',
-              'type'      => 'file',
-              'root_path' => @root_path
-            }
-          }
-        }
-      end
-
-      after(:each) do
-        FileUtils.remove_entry_secure(@tmpdir)
-      end
-
       it 'should create the root_path tree when none exists' do
         expect{ plugin_class.new('file/test', @options) }.to_not raise_error
         expect( File.exist?(@root_path) ).to be true
@@ -194,14 +197,38 @@ describe 'libkv file plugin anonymous class' do
         options = {
           'backend'  => 'test',
           'backends' => {
-            'test'  => { 'id' => 'test', 'type' => 'file' }
+            'test'  => {
+              'id'        => 'test',
+              'type'      => 'file',
+              'root_path' => @root_path,
+              'user'      => 'puppet',
+              'group'     => 'puppet'
+            }
           }
         }
 
-        allow(Dir).to receive(:exist?).with('/var/simp/libkv/file/test').and_return( false )
-        allow(FileUtils).to receive(:mkdir_p).with('/var/simp/libkv/file/test').
-          and_return(true)
-        allow(FileUtils).to receive(:chmod).with(0750, '/var/simp/libkv/file/test').
+        allow(FileUtils).to receive(:chmod).with(0750, @root_path).
+          and_raise(Errno::EACCES, 'Permission denied')
+
+        expect { plugin_class.new('file/test', options) }.
+          to raise_error(/libkv plugin file\/test Error: Unable to set permissions .* Permission denied/)
+      end
+
+      it 'should fail when root path ownership cannot be set' do
+        options = {
+          'backend'  => 'test',
+          'backends' => {
+            'test'  => {
+              'id'        => 'test',
+              'type'      => 'file',
+              'root_path' => @root_path,
+              'user'      => 'puppet',
+              'group'     => 'puppet'
+            }
+          }
+        }
+
+        allow(FileUtils).to receive(:chown).with('puppet', 'puppet', @root_path).
           and_raise(Errno::EACCES, 'Permission denied')
 
         expect { plugin_class.new('file/test', options) }.
@@ -213,27 +240,7 @@ describe 'libkv file plugin anonymous class' do
 
   context 'public API' do
     before(:each) do
-      @tmpdir = Dir.mktmpdir
-      @root_path = File.join(@tmpdir, 'libkv', 'file')
-      @options = {
-        'backend'  => 'test',
-        'backends' => {
-          'test'  => {
-            'id'                   => 'test',
-            'type'                 => 'file',
-            'root_path'            => @root_path,
-            'lock_timeout_seconds' => 1
-          }
-        }
-      }
       @plugin = plugin_class.new('file/test', @options)
-    end
-
-    after(:each) do
-      # in case one of the tests that removes directory ready permissions fails...
-      FileUtils.chmod_R('u=rwx', @tmpdir)
-
-      FileUtils.remove_entry_secure(@tmpdir)
     end
 
     describe 'delete' do
@@ -250,17 +257,22 @@ describe 'libkv file plugin anonymous class' do
         expect( File.exist?(key_file) ).to be false
       end
 
+      it 'should return :result=false and an :err_msg when the key is a dir not a file' do
+        keydir = 'keydir'
+        FileUtils.mkdir_p(File.join(@root_path, keydir))
+        result = @plugin.delete(keydir)
+        expect( result[:result] ).to be false
+        expect( result[:err_msg] ).to match(/Key specifies a folder/)
+      end
+
       it 'should return :result=false and an :err_msg when the key file delete fails' do
-        # make a key file that is inaccessible
-        key_file = File.join(@root_path, 'production/key1')
-        FileUtils.mkdir_p(File.dirname(key_file))
-        FileUtils.touch(key_file)
-        FileUtils.chmod(0400, File.dirname(key_file))
-        result = @plugin.delete('production/key1')
+        key_file = File.join(@root_path, 'key1')
+        allow(File).to receive(:unlink).with(key_file).
+          and_raise(Errno::EACCES, 'Permission denied')
+
+        result = @plugin.delete('key1')
         expect( result[:result] ).to be false
         expect( result[:err_msg] ).to match(/Delete failed:/)
-        FileUtils.chmod(0770, File.dirname(key_file))
-        expect( File.exist?(key_file) ).to be true
       end
     end
 
@@ -281,22 +293,19 @@ describe 'libkv file plugin anonymous class' do
       end
 
       it 'should return :result=false and an :err_msg when the key folder delete fails' do
-        # make a key file that is inaccessible so that recursive delete fails
         key_dir = File.join(@root_path, 'production/gen_passwd')
         FileUtils.mkdir_p(key_dir)
-        key_file = File.join(key_dir, 'key1')
-        FileUtils.touch(key_file)
-        FileUtils.chmod(0400, File.dirname(key_file))
+        allow(FileUtils).to receive(:rm_r).with(key_dir).
+          and_raise(Errno::EACCES, 'Permission denied')
+
         result = @plugin.deletetree('production/gen_passwd')
         expect( result[:result] ).to be false
         expect( result[:err_msg] ).to match(/Folder delete failed:/)
-        FileUtils.chmod(0770, File.dirname(key_file))
-        expect( Dir.exist?(key_dir) ).to be true
       end
     end
 
     describe 'exists' do
-      it 'should return :result=false when the key file does not exist' do
+      it 'should return :result=false when the key file does not exist or is inaccessible' do
         result = @plugin.exists('does/not/exist/key')
         expect( result[:result] ).to be false
         expect( result[:err_msg] ).to be_nil
@@ -308,18 +317,6 @@ describe 'libkv file plugin anonymous class' do
         result = @plugin.exists('key1')
         expect( result[:result] ).to be true
         expect( result[:err_msg] ).to be_nil
-      end
-
-      it 'should return :result=false when the key file exists but is not accessible' do
-        # make a key file that is inaccessible
-        key_file = File.join(@root_path, 'production/key1')
-        FileUtils.mkdir_p(File.dirname(key_file))
-        FileUtils.touch(key_file)
-        FileUtils.chmod(0400, File.dirname(key_file))
-        result = @plugin.exists('production/key1')
-        expect( result[:result] ).to be false
-        expect( result[:err_msg] ).to be_nil
-        FileUtils.chmod(0770, File.dirname(key_file))
       end
     end
 
@@ -333,14 +330,13 @@ describe 'libkv file plugin anonymous class' do
         expect( result[:err_msg] ).to be_nil
       end
 
-      it 'should return :unset result and an :err_msg when the key is a dir not a file' do
+      it 'should return unset :result and an :err_msg when the key is a dir not a file' do
         keydir = 'keydir'
         FileUtils.mkdir_p(File.join(@root_path, keydir))
         result = @plugin.get(keydir)
         expect( result[:result] ).to be_nil
         expect( result[:err_msg] ).to match(/Key specifies a folder/)
       end
-
 
       it 'should return an unset :result and an :err_msg when the key file does not exist' do
         result = @plugin.get('does/not/exist/key')
@@ -367,13 +363,11 @@ describe 'libkv file plugin anonymous class' do
       it 'should return an unset :result and an :err_msg when the key file exists but is not accessible' do
         # make a key file that is inaccessible
         key_file = File.join(@root_path, 'production/key1')
-        FileUtils.mkdir_p(File.dirname(key_file))
-        File.open(key_file, 'w') { |file| file.write('value for key1') }
-        FileUtils.chmod(0400, File.dirname(key_file))
+        allow(File).to receive(:open).with(key_file, 'r').
+          and_raise(Errno::EACCES, 'Permission denied')
         result = @plugin.get('production/key1')
         expect( result[:result] ).to be_nil
         expect( result[:err_msg] ).to match(/Key retrieval failed/)
-        FileUtils.chmod(0770, File.dirname(key_file))
       end
     end
 
@@ -417,17 +411,7 @@ describe 'libkv file plugin anonymous class' do
 
       end
 
-      it 'should return an unset :result and an :err_msg when key folder exists but is not accessible' do
-        # create inaccessible key folder that has content
-        @plugin.put('production/gen_passwd/key1', 'value for key1')
-        FileUtils.chmod(0400, File.join(@root_path, 'production'))
-        result = @plugin.list('production/gen_passwd')
-        FileUtils.chmod(0770, File.join(@root_path, 'production'))
-        expect( result[:result] ).to be_nil
-        expect( result[:err_msg] ).to match(/Key folder not found/)
-      end
-
-      it 'should return an unset :result  and an :err_msg when key folder does not exist' do
+      it 'should return an unset :result  and an :err_msg when key folder does not exist or is inaccessible' do
         result = @plugin.list('production')
         expect( result[:result] ).to be_nil
         expect( result[:err_msg] ).to match(/Key folder not found/)
@@ -450,6 +434,8 @@ describe 'libkv file plugin anonymous class' do
         expect( result[:result] ).to be true
         expect( result[:err_msg] ).to be_nil
         expect( @plugin.get(key)[:result] ).to eq value
+        key_file = File.join(@root_path, key)
+        expect( File.stat(key_file).mode & 0777 ).to eq 0640
       end
 
       it 'should return :result=true when the key file does not exist for a complex key' do
@@ -459,6 +445,10 @@ describe 'libkv file plugin anonymous class' do
         expect( result[:result] ).to be true
         expect( result[:err_msg] ).to be_nil
         expect( @plugin.get(key)[:result] ).to eq value
+        key_file = File.join(@root_path, key)
+        expect( File.stat(key_file).mode & 0777 ).to eq 0640
+        expect( File.stat(File.join(@root_path, 'production')).mode & 0777 ).to eq 0750
+        expect( File.stat(File.join(@root_path, 'production', 'gen_passwd')).mode & 0777 ).to eq 0750
       end
 
       it 'should return :result=true when the key file exists and is accessible' do
@@ -497,20 +487,14 @@ describe 'libkv file plugin anonymous class' do
         expect( result[:err_msg] ).to be_nil
       end
 
-      it 'should return :result=false an an :err_msg when the key file exists but is not accessible' do
-        # make a key file that is inaccessible
-        key = 'production/gen_passwd/key1'
-        value1 = 'first value for key1'
-        value2 = 'second value for key1'
-        @plugin.put(key, value1)
-        key_parent_dir = File.join(@root_path, 'production', 'gen_passwd')
-        FileUtils.chmod(0400, key_parent_dir)
+      it 'should return :result=false an an :err_msg when the key file cannot be created' do
+        key_file = File.join(@root_path, 'key')
+        allow(File).to receive(:open).with(key_file, File::RDWR|File::CREAT, 0640).
+          and_raise(Errno::EACCES, 'Permission denied')
 
-        result = @plugin.put(key, value2)
+        result = @plugin.put('key', 'value')
         expect( result[:result] ).to be false
         expect( result[:err_msg] ).to match(/Key write failed/)
-        FileUtils.chmod(0770, key_parent_dir)
-        expect( @plugin.get(key)[:result] ).to eq value1
       end
     end
   end
