@@ -1,12 +1,12 @@
-# DON'T USE THIS!! USE libkv_test::put_rwrapper INSTEAD.
+# Puppet language wrapper function for libkv::put
 #
-# This is a wrapper that will always select the 'default' backend
-# when none is specified in `options`.
+# We force the user to pass in options, so that libkv::put
+# doesn't always assume the backend in `default`!
 function libkv_test::put_pwrapper(
   String $key,
   Any    $value,
-  Hash   $meta    = {},
-  Hash   $options = {}
+  Hash   $options,
+  Hash   $meta     = {},
 ) {
 
   #

@@ -13,11 +13,10 @@
 * [Module Description](#module-description)
 * [Terminology](#terminology)
 * [Usage](#usage)
-  * [Function Examples](#function-examples)
-  * [Configuration](#configuration)
-    * [Single backend configuration](#single-backend-configuration)
-    * [Default hiearchy backend configuration](#default-hiearchy-backend-configuration)
-    * [File plugin configuration](#file-plugin-configuration)
+  * [Single Backend Example](#single-backend-example)
+  * [Multiple Backend Example](#multiple-backend-example)
+  * [libkv Configuration Reference](#libkv-configuration-reference)
+* [File Store and Plugin](#file-store-and-plugin)
 * [Limitations](#limitations)
 * [Plugin Development](#plugin-development)
   * [Plugin Loading](#plugin-loading)
@@ -88,19 +87,23 @@ Using `libkv` is simple:
 * Reconfigure the backend(s) in Hieradata, as your needs change.  No changes
   to your Puppet code will be required.
 
-### Function Examples
+The backend configuration of `libkv` can be as simple as you want (one backend)
+or complex (multiple backends with defaults for specific classes, defined type
+instances or defined types).  Examples of both scenarios will be shown in this
+section.
 
-Here are a few examples of using the `libkv` functions.
+### Single Backend Example
 
-Example: Store and retrieve host information
+This example will store and retrieve host information using libkv function signatures
+and configuration that support a single backend.
 
-Store a node's hostname and IP address:
+To store a node's hostname and IP address:
 
 ```puppet
 libkv::put("hosts/${facts['clientcert']}", $facts['ipaddress'])
 ```
 
-Create a hosts file using the list of stored host information:
+To create a hosts file using the list of stored host information:
 
 ```puppet
 $hosts = libkv::list('hosts')
@@ -111,22 +114,98 @@ $hosts.each |$host, $ip | {
 }
 ```
 
-### Configuration
+In hieradata, configure the backend with ``libkv::options`` Hash.  This example,
+will configure libkv's file backend.
 
-The backend configuration of `libkv` can be as simple as you want (one backend)
-or complex (multiple backends with defaults for specific classes, defined type
-instances or defined types).  Let's start with the simple configuration to
-illustrate key configuration.
+```yaml```
+libkv::options:
+  # global options
+  # The environment name to prepend to each key.
+  environment: "%{server_facts.environment}"
+  # Whether to return null values in lieu of failing when a backend
+  # operation fails.  You almost always want this to be false.
+  softfail: false
 
-#### Single backend configuration
+  # We only have one backend, so set it explicitly to our single backend.
+  # (This is omitted when we are using multiple backends.)
+  backend: default
 
-For this example, we are going to illustrate use of only one backend configuration
-with libkv's file plugin:
+  # Required Hash of backend configurations.  We have only 1 entry.
+  backends:
+    # This key matches the value of 'backend' above.
+    default:
+      # This is the plugin's advertised type and must be unique across all
+      # plugins.  The file plugin for libkv has a type of 'file'.
+      type: file
+      # This is a unique id for this configuration of the 'file' plugin.
+      id: file
+
+      # plugin-specific configuration
+      root_path: "/var/simp/libkv/file"
+      lock_timeout_seconds: 30
+      user: puppet
+      group: puppet
+```
+
+### Multiple Backends Example
+
+This example will store and retrieve host information using libkv function signatures
+and configuration that support a multiple backends.  The function signatures are a
+little more complicated, but still relatively straight forward to understand.
+
+To store a node's hostname and IP address:
+
+```puppet
+$libkv_options = 'Class[Mymodule::Myclass]'
+$empty_metadata = {}
+libkv::put("hosts/${facts['clientcert']}", $facts['ipaddress'], $empty_metadata, $libkv_options)
+```
+To create a hosts file using the list of stored host information:
+
+```puppet
+$libkv_options = 'Class[Mymodule::Myclass]'
+$hosts = libkv::list('hosts', $libkv_options)
+$hosts.each |$host, $ip | {
+  host { $host:
+    ip => $ip,
+  }
+}
+```
+
+Notice that we are explicitly setting the resource identifier in
+both the `libkv::put`` and `libkv::list` function calls.  This allows
+us to use a default hierarchy to determine which backend to use.
+
+The default hierarchy looks for matches  to 'default.
 
 
-#### Default hierachy backend configuration
 
-#### File plugin configuration
+
+### libkv Configuration Reference
+
+## File Store and Plugin
+
+libkv provides a file-based key/value store and its plugin.  This file store
+maintains individual key files on a local filesystem, has a backend type `file`,
+and supports the following plugin-specific configuration parameters.
+
+* `root_path`: Root directory path for the key files
+
+  * User must ensure the parent directory of this file accessible to Puppet.
+  * Defaults to `/var/simp/libkv/file/<id>`
+
+* `lock_timeout_seconds`: Maximum number of seconds to wait for an exclusive
+   file lock on a file modifying operation before failing the operation.
+
+  * Defaults to 5 seconds.
+
+* `user`: Username of owner for created directories and files.
+
+  *  Defaults to user executing code.
+
+* `group`: Group name for created directories and files.
+
+  * Defaults to group executing code
 
 ## Limitations
 

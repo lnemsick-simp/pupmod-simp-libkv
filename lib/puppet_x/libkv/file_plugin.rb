@@ -25,13 +25,13 @@ plugin_class = Class.new do
   # The plugin-specific configuration will be found in
   # `options['backends'][ options['backend'] ]`:
   #
-  # * `root_path`: root directory path; defaults to '/var/simp/libkv/file'
+  # * `root_path`: root directory path; defaults to '/var/simp/libkv/<name>'
   # * `lock_timeout_seconds`: max seconds to wait for an exclusive file lock
   #   on a file modifying operation before failing the operation; defaults
-  #   to 20 seconds
+  #   to 5 seconds
   # * `user`: user for created directories and files; defaults to user
   #   executing code
-  # * `group`: group for created directories and files; defaults to user
+  # * `group`: group for created directories and files; defaults to group
   #   executing code
   #
   # @param name Name to ascribe to this plugin instance

@@ -58,21 +58,14 @@ describe 'libkv file plugin' do
         ensure => directory
       }
 
-      # Calls libkv::put directly and via both a Puppet-language function
-      # and a Ruby-language function
+      # Calls libkv::put directly and via a Puppet-language function
       # * Stores values of different types.  Binary content is handled
       #   via a separate test.
-      #   Ruby-language function, libkv_test::put_rwrapper, should go to the
-      #   correct backend instance, 'file/class'.  libkv_test::put_rwrapper
-      #   works properly because it is written in a way to access full scope.
-      # * The put operations from the Puppet language function,
-      #   libkv_test::put_pwrapper(), should go to the default backend instance,
-      #   'file/default', instead of the correct backend instance.  This
-      #   wrapper function cannot work properly because there is no way to
-      #   inject the full scope into that function.
+      # * One of the calls to the Puppet-language function will go to the
+      #   default backend
       class { 'libkv_test::put': }
 
-      # These two defines call libkv::put directly and via the Ruby-language
+      # These two defines call libkv::put directly and via the Puppet-language
       # function
       # * The 'define1' put operations should use the 'file/define_instance'
       #   backend instance.
@@ -104,13 +97,13 @@ describe 'libkv file plugin' do
         '/var/simp/libkv/file/class/production/from_class/array_integers_with_meta',
         '/var/simp/libkv/file/class/production/from_class/hash_with_meta',
 
-        '/var/simp/libkv/file/class/production/from_class/boolean_from_rfunction',
-        '/var/simp/libkv/file/default/production/from_class/boolean_from_pfunction',
+        '/var/simp/libkv/file/class/production/from_class/boolean_from_pfunction',
+        '/var/simp/libkv/file/default/production/from_class/boolean_from_pfunction_no_resource',
 
         '/var/simp/libkv/file/define_instance/production/from_define/define2/string',
-        '/var/simp/libkv/file/define_instance/production/from_define/define2/string_from_rfunction',
+        '/var/simp/libkv/file/define_instance/production/from_define/define2/string_from_pfunction',
         '/var/simp/libkv/file/define_type/production/from_define/define1/string',
-        '/var/simp/libkv/file/define_type/production/from_define/define1/string_from_rfunction'
+        '/var/simp/libkv/file/define_type/production/from_define/define1/string_from_pfunction'
       ].each do |file|
         # validation of content will be done in 'get' test
         it "should create #{file}" do
@@ -156,7 +149,7 @@ describe 'libkv file plugin' do
         # class uses libkv::list to retrieve list of keys/values/metadata tuples
         # for keys in the 'file/class' backend; fails compilation if the
         # retrieved info does match expected
-        class { 'libkv_test::exists': }
+        class { 'libkv_test::list': }
         EOS
       }
 
