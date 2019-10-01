@@ -2,7 +2,7 @@
 #
 # @author https://github.com/simp/pupmod-simp-libkv/graphs/contributors
 #
-Puppet::Functions.create_function(:'libkv::exists', Puppet::Functions::InternalFunction) do
+Puppet::Functions.create_function(:'libkv::exists') do
 
   # @param key The key to be set
   # @param options Hash that specifies global libkv options and/or the specific
@@ -41,6 +41,22 @@ Puppet::Functions.create_function(:'libkv::exists', Puppet::Functions::InternalF
   #       truly global.
   #     * Defaults to the Puppet environment for the node.
   #
+  #   * `resource`: String.  Name of the Puppet resource initiating this libkv
+  #     operation
+  #
+  #     * Required when `backend` is not specified and you want to be able
+  #       to use more than the `default` backend.
+  #     * String should be resource as it would appear in the catalog
+  #
+  #       * 'Class[<class>]' for a class, e.g.  'Class[Mymodule::Myclass]'
+  #       * '<Defined type>[<instance>]' for a defined type instance, e.g.,
+  #         'Mymodule::Mydefine[myinstance]'
+  #
+  #     * Cannot be reliably determined automatically.  Appropriate scope
+  #       is not necessarily available when a libkv function is called within
+  #       any other function.  This is problematic for heavily used Puppet
+  #       built-in functions such as `each`.
+  #
   #  * `softfail`: Boolean. Whether to ignore libkv operation failures.
   #
   #    * When `true`, this function will return a result even when the operation
@@ -62,12 +78,11 @@ Puppet::Functions.create_function(:'libkv::exists', Puppet::Functions::InternalF
   #   in the merged backend options, returns nil
   #
   dispatch :exists do
-    scope_param()
     required_param 'String[1]', :key
     optional_param 'Hash',      :options
   end
 
-  def exists(scope, key, options={})
+  def exists(key, options={})
     # key validation difficult to do via a type alias, so validate via function
     call_function('libkv::validate_key', key)
 
@@ -77,10 +92,10 @@ Puppet::Functions.create_function(:'libkv::exists', Puppet::Functions::InternalF
     # determine backend configuration using options, `libkv::options`,
     # and the list of backends for which plugins have been loaded
     begin
-      calling_resource = get_calling_resource(scope)
-      catalog = scope.find_global_scope.catalog
-      merged_options = call_function( 'libkv::get_backend_config',
-        options, catalog.libkv.backends, calling_resource)
+      resource = options.has_key?('resource') ?  options['resource'] : 'unknown'
+      catalog = closure_scope.find_global_scope.catalog
+      merged_options = call_function( 'libkv::get_backend_config', options,
+        catalog.libkv.backends, resource)
     rescue ArgumentError => e
       msg = "libkv Configuration Error for libkv::exists with key='#{key}': #{e.message}"
       raise ArgumentError.new(msg)
@@ -99,24 +114,5 @@ Puppet::Functions.create_function(:'libkv::exists', Puppet::Functions::InternalF
     end
 
     success
-  end
-
-  # TODO Move this into a common function in PuppetX namespace with environment-safe
-  # protections.  The parameter is a Puppet::Parser::Scope, which is not a Puppet Type.
-  # So, can't use regular Puppet 4 API Ruby function.
-  def get_calling_resource(callers_scope)
-    calling_resource = 'Class[main]'
-    current_scope = callers_scope
-    found = false
-    while !found
-      scope_s = current_scope.to_s
-      if scope_s.start_with?('Scope(')
-        calling_resource = scope_s.split('Scope(').last[0..-2]
-        found = true
-      end
-      found = true if current_scope.is_topscope?
-      current_scope = current_scope.parent
-    end
-    calling_resource
   end
 end

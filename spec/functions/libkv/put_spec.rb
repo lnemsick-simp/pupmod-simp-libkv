@@ -8,6 +8,7 @@ describe 'libkv::put' do
     # set up configuration for the file plugin
     @tmpdir = Dir.mktmpdir
     @root_path_test_file = File.join(@tmpdir, 'libkv', 'test_file')
+    @root_path_default_class = File.join(@tmpdir, 'libkv', 'default_class')
     @root_path_default   = File.join(@tmpdir, 'libkv', 'default')
     options_base = {
       'environment' => 'production',
@@ -25,6 +26,11 @@ describe 'libkv::put' do
           'type'      => 'file',
           'root_path' => @root_path_test_file
         },
+        'default.Class[Mymodule::Myclass]'  => {
+          'id'        => 'default_class',
+          'type'      => 'file',
+          'root_path' => @root_path_default_class
+        },
         'default'  => {
           'id'        => 'default',
           'type'      => 'file',
@@ -32,9 +38,10 @@ describe 'libkv::put' do
         }
       }
     }
-    @options_failer     = options_base.merge ({ 'backend' => 'test_failer' } )
-    @options_test_file  = options_base.merge ({ 'backend' => 'test_file' } )
-    @options_default    = options_base
+    @options_failer        = options_base.merge ({ 'backend' => 'test_failer' } )
+    @options_test_file     = options_base.merge ({ 'backend' => 'test_file' } )
+    @options_default_class = options_base.merge ({ 'resource' => 'Class[Mymodule::Myclass]' } )
+    @options_default       = options_base
   end
 
   after(:each) do
@@ -62,11 +69,19 @@ describe 'libkv::put' do
       end
     end
 
-    it 'should store key,value,metadata tuple to the default backend in options' do
+    it 'should store key,value,metadata tuple to the default backend in options when resource unspecified' do
       is_expected.to run.with_params(key, value , metadata, @options_default).
         and_return(true)
 
       key_file = File.join(@root_path_default, 'production', key)
+      expect( File.exist?(key_file) ).to be true
+    end
+
+    it 'should store key,value,metadata tuple to the default backend for resource' do
+      is_expected.to run.with_params(key, value , metadata, @options_default_class).
+        and_return(true)
+
+      key_file = File.join(@root_path_default_class, 'production', key)
       expect( File.exist?(key_file) ).to be true
     end
 

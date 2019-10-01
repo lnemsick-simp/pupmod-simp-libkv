@@ -8,6 +8,7 @@ describe 'libkv::get' do
     # set up configuration for the file plugin
     @tmpdir = Dir.mktmpdir
     @root_path_test_file = File.join(@tmpdir, 'libkv', 'test_file')
+    @root_path_default_class = File.join(@tmpdir, 'libkv', 'default_class')
     @root_path_default   = File.join(@tmpdir, 'libkv', 'default')
     options_base = {
       'environment' => 'production',
@@ -25,6 +26,11 @@ describe 'libkv::get' do
           'type'      => 'file',
           'root_path' => @root_path_test_file
         },
+        'default.Class[Mymodule::Myclass]'  => {
+          'id'        => 'default_class',
+          'type'      => 'file',
+          'root_path' => @root_path_default_class
+        },
         'default'  => {
           'id'        => 'default',
           'type'      => 'file',
@@ -32,9 +38,10 @@ describe 'libkv::get' do
         }
       }
     }
-    @options_failer     = options_base.merge ({ 'backend' => 'test_failer' } )
-    @options_test_file  = options_base.merge ({ 'backend' => 'test_file' } )
-    @options_default    = options_base
+    @options_failer        = options_base.merge ({ 'backend' => 'test_failer' } )
+    @options_test_file     = options_base.merge ({ 'backend' => 'test_file' } )
+    @options_default_class = options_base.merge ({ 'resource' => 'Class[Mymodule::Myclass]' } )
+    @options_default       = options_base
   end
 
   after(:each) do
@@ -51,6 +58,7 @@ describe 'libkv::get' do
 
   context 'without libkv::options' do
     let(:test_file_keydir) { File.join(@root_path_test_file, 'production') }
+    let(:default_class_keydir) { File.join(@root_path_default_class, 'production') }
     let(:default_keydir) { File.join(@root_path_default, 'production') }
 
     data_info.each do |summary,info|
@@ -76,13 +84,22 @@ describe 'libkv::get' do
       end
     end
 
-    it 'should retrieve the key,value,metadata tuple from the default backend in options' do
+    it 'should retrieve the key,value,metadata tuple from the default backend in options when resource unspecified' do
       FileUtils.mkdir_p(default_keydir)
       key_file = File.join(default_keydir, key)
       File.open(key_file, 'w') { |file| file.write(serialized_value) }
 
       expected = { 'value' => value, 'metadata' => metadata }
       is_expected.to run.with_params(key, @options_default).and_return(expected)
+    end
+
+    it 'should retrieve the key,value,metadata tuple from the default backend for resource' do
+      FileUtils.mkdir_p(default_class_keydir)
+      key_file = File.join(default_class_keydir, key)
+      File.open(key_file, 'w') { |file| file.write(serialized_value) }
+
+      expected = { 'value' => value, 'metadata' => metadata }
+      is_expected.to run.with_params(key, @options_default_class).and_return(expected)
     end
 
     it 'should use environment-less key when environment is empty' do

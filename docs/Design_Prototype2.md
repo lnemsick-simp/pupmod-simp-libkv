@@ -450,14 +450,14 @@ conform to the following conventions:
     `<Define type>[<instance>]` portion of the name is how the defined
     resource is represented in the Puppet catalog.  For example, for the
     `first` instance of the `mydefine` defined type, the appropriate
-    backend name will be `default.Myclass::Mydefine[first]`.
+    backend name will be `default.Mymodule::Mydefine[first]`.
 
   * `default.<Define type>` specifies the default backend configuration
     for all instances of a defined type.  The `<Define type>` portion
     of the name is the first part of how a specific defined resource is
     represented in the Puppet catalog.  For example, for all instances
     of a `mydefine` Define, the appropriate backend name will be
-    `default.Myclass::Mydefine`.
+    `default.Mymodule::Mydefine`.
 
   * `default` specifies the default backend configuration when no
     other `default.xxx` configuration matches the name of the resource
@@ -572,7 +572,7 @@ configuration defaults is specified.
       "default.Class[Mymodule::Myclass]":       "%{alias('libkv::backend::consul')}"
 
       # specific instance of mymodule::mydefine defined type
-      "default.Mymodule::Mydefine[Myinstance]": "%{alias('libkv::backend::consul')}"
+      "default.Mymodule::Mydefine[myinstance]": "%{alias('libkv::backend::consul')}"
 
       # all mymodule::mydefine instances not matching a specific instance default
       "default.Mymodule::Mydefine":             "%{alias('libkv::backend::alt_file')}"
@@ -620,92 +620,55 @@ entry.
 
 The standard options available are as follows:
 
-* `softfail`: Boolean.  When set to `true`, each function will return results,
-  even when the operation has failed.  When the operation that failed
-  was a retrieval operation (e.g., `get`), the returned value will be an
-  appropriate empty/null object.  Defaults to `false`.
-* `environment`: String. When set to a non-empty string, the value is prepended
-  to the `key` or `keydir` parameters. Should only be set to an empty string
-  when the key being accessed is truly global.  Defaults to the Puppet
-  environment for the node.
-* `backend`: String.  Name of the backend to use.  Must be a key in the
-  'backends' sub-Hash of the merged options Hash.  When absent, the libkv
-   function will look for a backend whose name matches the calling Class,
-   specific Define, or Define type.  If no match is found, it will use the
-   'default' backend.
+* `backends`: Hash.  Hash of backend configurations
+
+  * Each backend configuration in the merged options Hash must be
+    a Hash that has the following keys:
+
+    * `type`:  Backend type.
+    * `id`:  Unique name for the instance of the backend. (Same backend
+      type can be configured differently).
+
+   * Other keys for configuration specific to the backend may also be
+     present.
+
+* `backend`: String.  Name of the backend to use.
+
+  * When present, must match a key in the `backends` option of the
+    merged options Hash.
+  * When absent and not specified in `libkv::options`, this function
+    will look for a 'default.xxx' backend whose name matches the
+    catalog resource id of the calling Class, specific defined type
+    instance, or defined type.  If no match is found, it will use
+    the 'default' backend.
+
+* `environment`: String.  Puppet environment to prepend to keys.
+
+  * When set to a non-empty string, it is prepended to the key used in
+    the backend operation.
+  * Should only be set to an empty string when the key being accessed is
+    truly global.
+  * Defaults to the Puppet environment for the node.
+
+* `resource`: String.  Name of the Puppet resource initiating this libkv
+  operation
+
+  * Required when `backend` is not specified and you want to be able
+    to use more than the `default` backend.
+  * String should be resource as it would appear in the catalog
+
+    * 'Class[<class>]' for a class, e.g.  'Class[Mymodule::Myclass]'
+    * '<Defined type>[<instance>]' for a defined type instance, e.g.,
+      'Mymodule::Mydefine[myinstance]'
+
+  * **Cannot be reliably determined automatically.**  Appropriate scope
+    is not necessarily available when a libkv function is called within
+    any other function.  This is problematic for heavily used Puppet
+    built-in functions such as `each`.
 
 ### Function Signatures
 
-* libkv::put: Sets the data at `key` to a `value` in the configured backend.
-  Optionally sets metadata along with the `value`.
-
-  * `Boolean libkv::put(String key, NotUndef value, Hash metadata={}, Hash options={})`
-  * Raises upon backend failure, unless `options['softfail']` is `true`
-  * Returns `true` when backend operation succeeds
-  * Returns `false` when backend operation fails and `options['softfail']`
-    is `true`
-
-* libkv::get: Retrieves the value and any metadata stored at `key` from the
-  configured backend.
-
-  * `Enum[Hash,Undef] libkv::get(String key, Hash options={})`
-  * Raises upon backend failure, unless `options['softfail']` is `true`
-  * Returns a Hash when the backend operation succeeds
-
-    * Hash will have a 'value' key containing the retrieved value of type
-      `Any`
-    * Hash may have a 'metadata' key containing a Hash with any metadata
-      for the key
-
-  * Returns `nil` , when the backend operation fails and `options['softfail']`
-    is `true`
-
-* libkv::delete: Deletes a `key` from the configured backend.
-
-  * `Boolean libkv::delete(String key, Hash options={})`
-  * Raises upon backend failure, unless `options['softfail']` is `true`
-  * Returns `true` when backend operation succeeds
-  * Returns `false` when backend operation fails and `options['softfail']`
-    is `true`
-
-* libkv::exists: Returns whether the `key` exists in the configured backend.
-
-  * `Enum[Boolean,Undef] libkv::exists(String key, Hash options={})`
-  * Raises upon backend failure, unless `options['softfail']` is `true`
-  * Returns key status (`true` or `false`), when the backend operation succeeds
-  * Returns `nil`, when the backend operation fails and `options['softfail']`
-    is `true`
-
-* libkv::list: Returns a list of all keys in a folder.
-
-  * `Enum[Hash,Undef] libkv::list(String keydir, Hash options={})`
-  * Raises upon backend failure, unless `options['softfail']` is `true`
-  * Returns a Hash when the backend operation succeeds
-
-    * Each key in the returned Hash will be a key (`String`) in the backend
-    * Each value in the returned Hash will be a Hash that itself contains a
-      'value' key with the value (`Any`) and a 'metadata' key with any metadata
-      for the key (`Hash`)
-    * Example
-
-      ```ruby
-
-        {
-          'key1' => {'value' => 'hello', 'metadata' => { ... } },
-          'key2' => {'value' => 'Bob',   'metadata' => { ... } }
-        }
-
-      ```
-  * Returns `nil`, when the backend operation fails and `options['softfail']`
-    is `true`
-
-* libkv::deletetree: Deletes a whole folder from the configured backend.
-
-  * `Boolean libkv::deletetree(String keydir, Hash options={})`
-  * Raises upon backend failure, unless `options['softfail']` is `true`
-  * Returns `true` when backend operation succeeds
-  * Returns `false` when backend operation fails and `options['softfail']`
-    is `true`
+See REFERENCE.md
 
 ### libkv plugin adapter
 
@@ -717,7 +680,7 @@ in a fashion that prevents cross-environment contamination when Ruby code
 is loaded into the puppetserver....a requirement that necessarily adds
 complexity to both the plugin adapter and the plugins it loads.
 
-There are two mechanisms for creating environment-contained adapter and 
+There are two mechanisms for creating environment-contained adapter and
 plugin code:
 
 * Create anonymous classes accessible by predefined local variables upon
@@ -739,16 +702,7 @@ but on the design:  the responsibilities and API of the plugin adapter.
 
 * The plugin adapter must serialize data to be persisted into a common
   format and then deserialize upon retrieval.
-    * Transformation done only in one place, instead of in each plugin (DRY).
-    * Prevents value objects from being modified by plugin function code.
-      This is especially of concern of complex Hash objects, for which
-      there is no deep copy mechanism.  (`Hash.dup` does *not* deep copy!)
 
-  * It must safely handle unexpected plugin failures, including failures to
-    load (e.g., malformed Ruby).
-
-* The plugin adapter must serialize data to be persisted into a common
-  format and then deserialize upon retrieval.
     * Transformation done only in one place, instead of in each plugin (DRY).
     * Prevents value objects from being modified by plugin function code.
       This is especially of concern of complex Hash objects, for which
@@ -771,14 +725,8 @@ modifying operations to the backend plugins.
 * Each plugin may choose to offer a retry option, to minimize failed catalog
   compiles when connectivity to its remote backend is spotty.
 
-As described in []#() All plugins must be written in pure Ruby.
 
-
-* All plugin code must be able to be loaded in a fashion that prevents
-  cross-environment code contamination, when loaded in the puppetserver.
-
-  * This requires dynamically loaded classes that are either anonymous or
-    that contain generated class names.  Both options result in necessarily
+Each plugin must conform
     fugly code.
 * The plugin for each backend must support all the operations in this API.
 
