@@ -98,6 +98,22 @@ Supported options keys:
     truly global.
   * Defaults to the Puppet environment for the node.
 
+* `resource`: String.  Name of the Puppet resource initiating this libkv
+  operation
+
+  * Required when `backend` is not specified and you want to be able
+    to use more than the `default` backend.
+  * String should be resource as it would appear in the catalog
+
+    * 'Class[<class>]' for a class, e.g.  'Class[Mymodule::Myclass]'
+    * '<Defined type>[<instance>]' for a defined type instance, e.g.,
+      'Mymodule::Mydefine[myinstance]'
+
+  * Cannot be reliably determined automatically.  Appropriate scope
+    is not necessarily available when a libkv function is called within
+    any other function.  This is problematic for heavily used Puppet
+    built-in functions such as `each`.
+
 ### libkv::deletetree
 
 Type: Ruby 4.x API
@@ -163,6 +179,22 @@ Supported options keys:
     truly global.
   * Defaults to the Puppet environment for the node.
 
+* `resource`: String.  Name of the Puppet resource initiating this libkv
+  operation
+
+  * Required when `backend` is not specified and you want to be able
+    to use more than the `default` backend.
+  * String should be resource as it would appear in the catalog
+
+    * 'Class[<class>]' for a class, e.g.  'Class[Mymodule::Myclass]'
+    * '<Defined type>[<instance>]' for a defined type instance, e.g.,
+      'Mymodule::Mydefine[myinstance]'
+
+  * Cannot be reliably determined automatically.  Appropriate scope
+    is not necessarily available when a libkv function is called within
+    any other function.  This is problematic for heavily used Puppet
+    built-in functions such as `each`.
+
 ### libkv::exists
 
 Type: Ruby 4.x API
@@ -227,6 +259,22 @@ Supported options keys:
   * Should only be set to an empty string when the key being accessed is
     truly global.
   * Defaults to the Puppet environment for the node.
+
+* `resource`: String.  Name of the Puppet resource initiating this libkv
+  operation
+
+  * Required when `backend` is not specified and you want to be able
+    to use more than the `default` backend.
+  * String should be resource as it would appear in the catalog
+
+    * 'Class[<class>]' for a class, e.g.  'Class[Mymodule::Myclass]'
+    * '<Defined type>[<instance>]' for a defined type instance, e.g.,
+      'Mymodule::Mydefine[myinstance]'
+
+  * Cannot be reliably determined automatically.  Appropriate scope
+    is not necessarily available when a libkv function is called within
+    any other function.  This is problematic for heavily used Puppet
+    built-in functions such as `each`.
 
 ### libkv::get
 
@@ -297,6 +345,22 @@ Supported options keys:
   * Should only be set to an empty string when the key being accessed is
     truly global.
   * Defaults to the Puppet environment for the node.
+
+* `resource`: String.  Name of the Puppet resource initiating this libkv
+  operation
+
+  * Required when `backend` is not specified and you want to be able
+    to use more than the `default` backend.
+  * String should be resource as it would appear in the catalog
+
+    * 'Class[<class>]' for a class, e.g.  'Class[Mymodule::Myclass]'
+    * '<Defined type>[<instance>]' for a defined type instance, e.g.,
+      'Mymodule::Mydefine[myinstance]'
+
+  * Cannot be reliably determined automatically.  Appropriate scope
+    is not necessarily available when a libkv function is called within
+    any other function.  This is problematic for heavily used Puppet
+    built-in functions such as `each`.
 
 ### libkv::get_backend_config
 
@@ -421,6 +485,22 @@ Supported options keys:
     truly global.
   * Defaults to the Puppet environment for the node.
 
+* `resource`: String.  Name of the Puppet resource initiating this libkv
+  operation
+
+  * Required when `backend` is not specified and you want to be able
+    to use more than the `default` backend.
+  * String should be resource as it would appear in the catalog
+
+    * 'Class[<class>]' for a class, e.g.  'Class[Mymodule::Myclass]'
+    * '<Defined type>[<instance>]' for a defined type instance, e.g.,
+      'Mymodule::Mydefine[myinstance]'
+
+  * Cannot be reliably determined automatically.  Appropriate scope
+    is not necessarily available when a libkv function is called within
+    any other function.  This is problematic for heavily used Puppet
+    built-in functions such as `each`.
+
 ### libkv::put
 
 Type: Ruby 4.x API
@@ -499,6 +579,22 @@ Supported options keys:
   * Should only be set to an empty string when the key being accessed is
     truly global.
   * Defaults to the Puppet environment for the node.
+
+* `resource`: String.  Name of the Puppet resource initiating this libkv
+  operation
+
+  * Required when `backend` is not specified and you want to be able
+    to use more than the `default` backend.
+  * String should be resource as it would appear in the catalog
+
+    * 'Class[<class>]' for a class, e.g.  'Class[Mymodule::Myclass]'
+    * '<Defined type>[<instance>]' for a defined type instance, e.g.,
+      'Mymodule::Mydefine[myinstance]'
+
+  * Cannot be reliably determined automatically.  Appropriate scope
+    is not necessarily available when a libkv function is called within
+    any other function.  This is problematic for heavily used Puppet
+    built-in functions such as `each`.
 
 ### libkv::validate_backend_config
 
