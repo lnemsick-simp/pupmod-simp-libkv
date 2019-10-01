@@ -18,17 +18,21 @@
 * [Design](#design)
 
   * [Changes from Version 0.6.X](#changes-from-version-0.6.x)
+  * [libkv Configuration](#libkv-configuration)
+
+    * [Backend Configuration Entries](#backend-configuration-entries)
+    * [Default Backend Selection](#default-backend-selection)
+    * [Example 1: Single libkv backend](#example-1:-single-libkv-backend)
+    * [Example 2: Multiple libkv backends](#example-2:-multiple-libkv-backends)
+
   * [libkv Puppet Functions](#libkv-puppet-functions)
 
     * [Overview](#Overview)
     * [Common Function Options](#common-functions-options)
     * [Functions Signatures](#functions-signatures)
 
+  * [Plugin Adapter](#plugin-adapter)
   * [Plugin API](#libkv-plugin-API)
-  * [Plugin API](#libkv-plugin-API)
-  * Overview
-    * libkv adapter responsibilities
-    * libkv plugin responsibilities
 
 ## Terminology
 
@@ -348,6 +352,10 @@ from using `File` resources with the `source` set to `File` resources with
 
 ## Design
 
+This section discusses at a high level the design to meet the second prototype
+requirements.  For indepth understanding of the design,please refer to the
+prototype software and is tests.
+
 ### Changes from Version 0.6.X
 
 Major design/API changes since version 0.6.X are as follows:
@@ -459,6 +467,10 @@ conform to the following conventions:
     of a `mydefine` Define, the appropriate backend name will be
     `default.Mymodule::Mydefine`.
 
+  * `default.<application grouping>` specifies the default backend
+    configuration grouped logically per application.  It is useful
+    when the backend to be used is to be share among many classes.
+
   * `default` specifies the default backend configuration when no
     other `default.xxx` configuration matches the name of the resource
     requesting a libkv operation via a `libkv` function.
@@ -473,17 +485,27 @@ the (`type`,`id`) pair defines a unique configuration.
 
 #### Default Backend Selection
 
+When the backend is not explicitly specified with a `backend` attribute
+in `libkv::options`, a simple backend search scheme is applied:
+
+
+* First look for an exact match of a backend named `default.<resource>`.
+
+  * For example `default.Class[Mymodule::Myclass]` or
+    `default.Mymodule::Mydefine[someinstance]`.
+  * They do not have to be actual Puppet resource strings, but, depending
+    upon your application, may make more sense if they are actual Puppet
+    resource strings.
+
+* Next look for a partial match of the form `default.<partial>`, where
+  partial is the part of the resource identifier prior to the '['.
+
+  * For example, `default.Mymodule::Mydefine` for all defines of type
+    mymodule::mydefine.
+
+* Finally, if no match is found, default to a backend named `default`.
    * When absent, a backend configuration named `default` must exist in
      `backends`.
-
-# Each function has an optional options Hash parameter that will be
-deep merged with this Hash.
-# *  If the merged Hash contains the key 'backend', it will specify which
-#    backend to use in the 'backends' sub-Hash below.
-# *  If the merged Hash does not contain the 'backend' key, the libkv function
-#    will look for a backend whose name matches the calling Class, specific
-#    Define, or Define type.
-# *  If no Class/Define match is found, it will use the 'default' backend.
 
 #### Example 1:  Single libkv backend
 
@@ -667,11 +689,11 @@ The standard options available are as follows:
     is called within any other function.  This is problematic for heavily
     used Puppet built-in functions such as `each`.
 
-### Function Signatures
+#### Function Signatures
 
 See REFERENCE.md
 
-### libkv plugin adapter
+### Plugin Adapter
 
 An instance of the plugin adapter must be maintained over the lifetime of
 a catalog compile. Puppet does not provide a mechanism to create such an
@@ -694,25 +716,25 @@ In either case the plugin adapter and plugin code must be written in pure
 Ruby and reside in the 'libkv/lib/puppet_x/libkv' directory.
 
 The documentation here will not focus on the specific method to be used,
-but on the design:  the responsibilities and API of the plugin adapter.
+but on the functionality of the plugin adapter.
 
+The responsibilities and API of the plugin adapter are as follows:
 
-  * It must construct plugin objects and retain them through the life of
-    a catalog instance.
-  * It must select the appropriate plugin object to use for each function call.
-
-* The plugin adapter must serialize data to be persisted into a common
-  format and then deserialize upon retrieval.
+* It must construct plugin objects and retain them through the life of
+  a catalog instance.
+* It must select the appropriate plugin object to use for each function call.
+* It must must serialize data to be persisted into a common format and then
+  deserialize upon retrieval.
 
     * Transformation done only in one place, instead of in each plugin (DRY).
     * Prevents value objects from being modified by plugin function code.
       This is especially of concern of complex Hash objects, for which
       there is no deep copy mechanism.  (`Hash.dup` does *not* deep copy!)
 
-  * It must safely handle unexpected plugin failures, including failures to
-    load (e.g., malformed Ruby).
+* It must safely handle unexpected plugin failures, including failures to
+  load (e.g., malformed Ruby).
 
-## Plugin API
+### Plugin API
 
 The simple libkv function API has relegated the complexity of atomic key/value
 modifying operations to the backend plugins.
@@ -725,30 +747,10 @@ modifying operations to the backend plugins.
   catalog instance (compile).
 * Each plugin may choose to offer a retry option, to minimize failed catalog
   compiles when connectivity to its remote backend is spotty.
-
-
-Each plugin must conform
-    fugly code.
 * The plugin for each backend must support all the operations in this API.
 
   * Writing Puppet code is difficult otherwise!
   * Mapping of the interface to the actual backend operations is up to
     the discretion of the plugin.
 
-Overview
-* The plugin adapter is responsible for managing and using plugin code.
-  It must
-
-  * Load plugins
-  * Serialize data to be persisted into a common format and then deserialize
-    upon retrieval.
-  * Safely handle unexpected plugin failures.
-
-* persisted in JSON
-      * This *ASSUMES* all the types within Puppet are built upon primitives for
-        which a meaningful `.to_json` method exists.
-      * Although JSON is not a compact/efficient representation, it is
-        universally parsable.
-
-libkv file key/value store
-
+The specifics of the plugin API can be found in `lib/puppet_x/libkv/plugin_template.rb`

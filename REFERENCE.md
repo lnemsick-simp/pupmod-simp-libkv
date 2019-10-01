@@ -110,7 +110,7 @@ Supported options keys:
     * '<Defined type>[<instance>]' for a defined type instance, e.g.,
       'Mymodule::Mydefine[myinstance]'
 
-  * Catalog resource id annot be reliably determined automatically.
+  * Catalog resource id cannot be reliably determined automatically.
     Appropriate scope is not necessarily available when a libkv function
     is called within any other function.  This is problematic for heavily
     used Puppet built-in functions such as `each`.
@@ -192,7 +192,7 @@ Supported options keys:
     * '<Defined type>[<instance>]' for a defined type instance, e.g.,
       'Mymodule::Mydefine[myinstance]'
 
-  * Catalog resource id annot be reliably determined automatically.
+  * Catalog resource id cannot be reliably determined automatically.
     Appropriate scope is not necessarily available when a libkv function
     is called within any other function.  This is problematic for heavily
     used Puppet built-in functions such as `each`.
@@ -274,7 +274,7 @@ Supported options keys:
     * '<Defined type>[<instance>]' for a defined type instance, e.g.,
       'Mymodule::Mydefine[myinstance]'
 
-  * Catalog resource id annot be reliably determined automatically.
+  * Catalog resource id cannot be reliably determined automatically.
     Appropriate scope is not necessarily available when a libkv function
     is called within any other function.  This is problematic for heavily
     used Puppet built-in functions such as `each`.
@@ -361,7 +361,7 @@ Supported options keys:
     * '<Defined type>[<instance>]' for a defined type instance, e.g.,
       'Mymodule::Mydefine[myinstance]'
 
-  * Catalog resource id annot be reliably determined automatically.
+  * Catalog resource id cannot be reliably determined automatically.
     Appropriate scope is not necessarily available when a libkv function
     is called within any other function.  This is problematic for heavily
     used Puppet built-in functions such as `each`.
@@ -501,7 +501,7 @@ Supported options keys:
     * '<Defined type>[<instance>]' for a defined type instance, e.g.,
       'Mymodule::Mydefine[myinstance]'
 
-  * Catalog resource id annot be reliably determined automatically.
+  * Catalog resource id cannot be reliably determined automatically.
     Appropriate scope is not necessarily available when a libkv function
     is called within any other function.  This is problematic for heavily
     used Puppet built-in functions such as `each`.
@@ -597,7 +597,7 @@ Supported options keys:
     * '<Defined type>[<instance>]' for a defined type instance, e.g.,
       'Mymodule::Mydefine[myinstance]'
 
-  * Catalog resource id annot be reliably determined automatically.
+  * Catalog resource id cannot be reliably determined automatically.
     Appropriate scope is not necessarily available when a libkv function
     is called within any other function.  This is problematic for heavily
     used Puppet built-in functions such as `each`.

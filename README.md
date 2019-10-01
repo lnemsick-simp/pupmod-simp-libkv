@@ -60,7 +60,6 @@ This module provides
 
   * Future versions of this module will provide a distributed key/value store.
 
-
 If you find any issues, they may be submitted to our
 [bug tracker](https://simp-project.atlassian.net/).
 
@@ -150,8 +149,9 @@ libkv::options:
 ### Multiple Backends Example
 
 This example will store and retrieve host information using libkv function signatures
-and configuration that support a multiple backends.  The function signatures are a
-little more complicated, but still relatively straight forward to understand.
+and configuration that support a multiple backends.  The function signatures and
+configuration are a little more complicated, but still relatively straight forward
+to understand.
 
 To store a node's hostname and IP address:
 
@@ -225,8 +225,8 @@ will configure multiple isntances of libkv's file backend.
 
 Notice that we are explicitly setting the resource identifier in
 both the `libkv::put`` and `libkv::list` function calls and their resource
-identifiers match one of the backens in our hieradata. Using the resource
-idntifiers allows us to use a default hierarchy to determine which backend to
+identifiers match one of the backends in our hieradata. Using the resource
+identifiers allows us to use a default hierarchy to determine which backend to
 use.
 
 The search within the default hierarchy is simple:
