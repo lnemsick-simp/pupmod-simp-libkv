@@ -116,7 +116,7 @@ $hosts.each |$host, $ip | {
 In hieradata, configure the backend with ``libkv::options`` Hash.  This example,
 will configure libkv's file backend.
 
-```yaml```
+```yaml
 libkv::options:
   # global options
   # The environment name to prepend to each key.
@@ -176,51 +176,50 @@ In hieradata, configure the backend with ``libkv::options`` Hash.  This example,
 will configure multiple isntances of libkv's file backend.
 
 ```yaml
+# The backend configurations here will be inserted into libkv::options
+# below via the alias function.
+libkv::backend::file:
+  type: file
+  id: file
 
-  # The backend configurations here will be inserted into libkv::options
-  # below via the alias function.
-  libkv::backend::file:
-    type: file
-    id: file
+  # plugin-specific configuration
+  root_path: "/var/simp/libkv/file"
+  lock_timeout_seconds: 30
+  user: puppet
+  group: puppet
 
-    # plugin-specific configuration
-    root_path: "/var/simp/libkv/file"
-    lock_timeout_seconds: 30
-    user: puppet
-    group: puppet
+libkv::backend::alt_file:
+  id: alt_file
+  type: file
+  root_path: "/some/other/path"
+  user: otheruser
+  group: othergroup
 
-  libkv::backend::alt_file:
-    id: alt_file
-    type: file
-    root_path: "/some/other/path"
-    user: otheruser
-    group: othergroup
+libkv::options:
+  # global options
+  environment: "%{server_facts.environment}"
+  softfail: false
 
-  libkv::options:
-    # global options
-    environment: "%{server_facts.environment}"
-    softfail: false
+  # Hash of backend configuration to be used to lookup the appropriate
+  # backend to use in libkv functions.
+  #
+  #  * More than one backend configuration name can use the same backend
+  #    configuration.  But each distinct backend configuration must have
+  #    a unique (id,type) pair.
+  #  * Individual resources can override the default by specifying
+  #    a `backend` key in its backend options hash.
+  backends:
+    # mymodule::myclass Class resource
+    "default.Class[Mymodule::Myclass]":       "%{alias('libkv::backend::file')}"
 
-    # Hash of backend configuration to be used to lookup the appropriate
-    # backend to use in libkv functions.
-    #
-    #  * More than one backend configuration name can use the same backend
-    #    configuration.  But each distinct backend configuration must have
-    #    a unique (id,type) pair.
-    #  * Individual resources can override the default by specifying
-    #    a `backend` key in its backend options hash.
-    backends:
-      # mymodule::myclass Class resource
-      "default.Class[Mymodule::Myclass]":       "%{alias('libkv::backend::file')}"
+    # specific instance of mymodule::mydefine defined type
+    "default.Mymodule::Mydefine[myinstance]": "%{alias('libkv::backend::file')}"
 
-      # specific instance of mymodule::mydefine defined type
-      "default.Mymodule::Mydefine[myinstance]": "%{alias('libkv::backend::file')}"
+    # all mymodule::mydefine instances not matching a specific instance default
+    "default.Mymodule::Mydefine":             "%{alias('libkv::backend::alt_file')}"
 
-      # all mymodule::mydefine instances not matching a specific instance default
-      "default.Mymodule::Mydefine":             "%{alias('libkv::backend::alt_file')}"
-
-      # all other resources
-      "default":                                "%{alias('libkv::backend::file')}"
+    # all other resources
+    "default":                                "%{alias('libkv::backend::file')}"
 ```
 
 Notice that we are explicitly setting the resource identifier in
