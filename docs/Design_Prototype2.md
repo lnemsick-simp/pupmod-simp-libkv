@@ -655,16 +655,17 @@ The standard options available are as follows:
 
   * Required when `backend` is not specified and you want to be able
     to use more than the `default` backend.
-  * String should be resource as it would appear in the catalog
+  * String should be resource as it would appear in the catalog or
+    some application grouping id
 
     * 'Class[<class>]' for a class, e.g.  'Class[Mymodule::Myclass]'
     * '<Defined type>[<instance>]' for a defined type instance, e.g.,
       'Mymodule::Mydefine[myinstance]'
 
-  * **Cannot be reliably determined automatically.**  Appropriate scope
-    is not necessarily available when a libkv function is called within
-    any other function.  This is problematic for heavily used Puppet
-    built-in functions such as `each`.
+  * **Catalog resource id cannot be reliably determined automatically.**
+    Appropriate scope is not necessarily available when a libkv function
+    is called within any other function.  This is problematic for heavily
+    used Puppet built-in functions such as `each`.
 
 ### Function Signatures
 

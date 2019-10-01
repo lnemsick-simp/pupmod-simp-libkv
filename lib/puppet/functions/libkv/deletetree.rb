@@ -53,10 +53,10 @@ Puppet::Functions.create_function(:'libkv::deletetree') do
   #       * '<Defined type>[<instance>]' for a defined type instance, e.g.,
   #         'Mymodule::Mydefine[myinstance]'
   #
-  #     * Cannot be reliably determined automatically.  Appropriate scope
-  #       is not necessarily available when a libkv function is called within
-  #       any other function.  This is problematic for heavily used Puppet
-  #       built-in functions such as `each`.
+  #     * Catalog resource id annot be reliably determined automatically.
+  #       Appropriate scope is not necessarily available when a libkv function
+  #       is called within any other function.  This is problematic for heavily
+  #       used Puppet built-in functions such as `each`.
   #
   #  * `softfail`: Boolean. Whether to ignore libkv operation failures.
   #

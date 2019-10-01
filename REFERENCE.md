@@ -110,10 +110,10 @@ Supported options keys:
     * '<Defined type>[<instance>]' for a defined type instance, e.g.,
       'Mymodule::Mydefine[myinstance]'
 
-  * Cannot be reliably determined automatically.  Appropriate scope
-    is not necessarily available when a libkv function is called within
-    any other function.  This is problematic for heavily used Puppet
-    built-in functions such as `each`.
+  * Catalog resource id annot be reliably determined automatically.
+    Appropriate scope is not necessarily available when a libkv function
+    is called within any other function.  This is problematic for heavily
+    used Puppet built-in functions such as `each`.
 
 ### libkv::deletetree
 
@@ -192,10 +192,10 @@ Supported options keys:
     * '<Defined type>[<instance>]' for a defined type instance, e.g.,
       'Mymodule::Mydefine[myinstance]'
 
-  * Cannot be reliably determined automatically.  Appropriate scope
-    is not necessarily available when a libkv function is called within
-    any other function.  This is problematic for heavily used Puppet
-    built-in functions such as `each`.
+  * Catalog resource id annot be reliably determined automatically.
+    Appropriate scope is not necessarily available when a libkv function
+    is called within any other function.  This is problematic for heavily
+    used Puppet built-in functions such as `each`.
 
 ### libkv::exists
 
@@ -274,10 +274,10 @@ Supported options keys:
     * '<Defined type>[<instance>]' for a defined type instance, e.g.,
       'Mymodule::Mydefine[myinstance]'
 
-  * Cannot be reliably determined automatically.  Appropriate scope
-    is not necessarily available when a libkv function is called within
-    any other function.  This is problematic for heavily used Puppet
-    built-in functions such as `each`.
+  * Catalog resource id annot be reliably determined automatically.
+    Appropriate scope is not necessarily available when a libkv function
+    is called within any other function.  This is problematic for heavily
+    used Puppet built-in functions such as `each`.
 
 ### libkv::get
 
@@ -361,10 +361,10 @@ Supported options keys:
     * '<Defined type>[<instance>]' for a defined type instance, e.g.,
       'Mymodule::Mydefine[myinstance]'
 
-  * Cannot be reliably determined automatically.  Appropriate scope
-    is not necessarily available when a libkv function is called within
-    any other function.  This is problematic for heavily used Puppet
-    built-in functions such as `each`.
+  * Catalog resource id annot be reliably determined automatically.
+    Appropriate scope is not necessarily available when a libkv function
+    is called within any other function.  This is problematic for heavily
+    used Puppet built-in functions such as `each`.
 
 ### libkv::get_backend_config
 
@@ -501,10 +501,10 @@ Supported options keys:
     * '<Defined type>[<instance>]' for a defined type instance, e.g.,
       'Mymodule::Mydefine[myinstance]'
 
-  * Cannot be reliably determined automatically.  Appropriate scope
-    is not necessarily available when a libkv function is called within
-    any other function.  This is problematic for heavily used Puppet
-    built-in functions such as `each`.
+  * Catalog resource id annot be reliably determined automatically.
+    Appropriate scope is not necessarily available when a libkv function
+    is called within any other function.  This is problematic for heavily
+    used Puppet built-in functions such as `each`.
 
 ### libkv::put
 
@@ -597,10 +597,10 @@ Supported options keys:
     * '<Defined type>[<instance>]' for a defined type instance, e.g.,
       'Mymodule::Mydefine[myinstance]'
 
-  * Cannot be reliably determined automatically.  Appropriate scope
-    is not necessarily available when a libkv function is called within
-    any other function.  This is problematic for heavily used Puppet
-    built-in functions such as `each`.
+  * Catalog resource id annot be reliably determined automatically.
+    Appropriate scope is not necessarily available when a libkv function
+    is called within any other function.  This is problematic for heavily
+    used Puppet built-in functions such as `each`.
 
 ### libkv::validate_backend_config
 
