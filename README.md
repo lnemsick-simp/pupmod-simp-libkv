@@ -172,16 +172,173 @@ $hosts.each |$host, $ip | {
 }
 ```
 
+In hieradata, configure the backend with ``libkv::options`` Hash.  This example,
+will configure multiple isntances of libkv's file backend.
+
+```yaml
+
+  # The backend configurations here will be inserted into libkv::options
+  # below via the alias function.
+  libkv::backend::file:
+    type: file
+    id: file
+
+    # plugin-specific configuration
+    root_path: "/var/simp/libkv/file"
+    lock_timeout_seconds: 30
+    user: puppet
+    group: puppet
+
+  libkv::backend::alt_file:
+    id: alt_file
+    type: file
+    root_path: "/some/other/path"
+    user: otheruser
+    group: othergroup
+
+  libkv::options:
+    # global options
+    environment: "%{server_facts.environment}"
+    softfail: false
+
+    # Hash of backend configuration to be used to lookup the appropriate
+    # backend to use in libkv functions.
+    #
+    #  * More than one backend configuration name can use the same backend
+    #    configuration.  But each distinct backend configuration must have
+    #    a unique (id,type) pair.
+    #  * Individual resources can override the default by specifying
+    #    a `backend` key in its backend options hash.
+    backends:
+      # mymodule::myclass Class resource
+      "default.Class[Mymodule::Myclass]":       "%{alias('libkv::backend::file')}"
+
+      # specific instance of mymodule::mydefine defined type
+      "default.Mymodule::Mydefine[myinstance]": "%{alias('libkv::backend::file')}"
+
+      # all mymodule::mydefine instances not matching a specific instance default
+      "default.Mymodule::Mydefine":             "%{alias('libkv::backend::alt_file')}"
+
+      # all other resources
+      "default":                                "%{alias('libkv::backend::file')}"
+```
+
 Notice that we are explicitly setting the resource identifier in
-both the `libkv::put`` and `libkv::list` function calls.  This allows
-us to use a default hierarchy to determine which backend to use.
+both the `libkv::put`` and `libkv::list` function calls and their resource
+identifiers match one of the backens in our hieradata. Using the resource
+idntifiers allows us to use a default hierarchy to determine which backend to
+use.
 
-The default hierarchy looks for matches  to 'default.
+The search within the default hierarchy is simple:
 
+* First look for an exact match of a backend named `default.<resource>`.
 
+  * For example `default.Class[Mymodule::Myclass]` or
+    `default.Mymodule::Mydefine[someinstance]`.
+  * They don't have to be actual Puppet resource strings, but, depending
+    upon your application, may make more sense if they are actual Puppet
+    resource strings.
+
+* Next look for a partial match of the form `default.<partial>`, where
+  partial is the part of the resource identifier prior to the '['.
+
+  * For example, `default.Mymodule::Mydefine` for all defines of type
+    mymodule::mydefine.
+
+* Finally, if no match is found, default to a backend named `default`.
 
 
 ### libkv Configuration Reference
+
+The libkv configuration used for each libkv function call is comprised of
+a merge of a function-provided options Hash, Hiera configuration specified
+by the `libkv::options` Hash, and global configuration defaults.  The merge
+is executed in a fashion to ensure the function-provided options take
+precedence over the `libkv::options` Hiera values.
+
+The merged libkv configuration contains global and backend-specific
+configurations. The primary keys in this Hash are as follows:
+
+* `backends`: Required Hash. Specifies backend configurations.  Each key
+   is the name of a backend configuration and its value contains the
+   corresponding configuration Hash.
+
+* `backend`: Optional String. Specifies a specific backend configuration
+   to use.
+
+   * When present, must match a key in `backends`.
+   * When absent, the backend configuration will be selected from the set of
+     default entries in `backends`, based on the name of the catalog resource
+     requesting a libkv operation.  (See [Default Backend Selection]
+     (#default-backend-selection)).
+
+* `environment`: Optional String.  Puppet environment to prepend to keys.
+
+   * When set to a non-empty string, it is prepended to the key or key folder
+     used in a backend operation.
+   * Should only be set to an empty string when the key being accessed is truly
+     global.
+   * Defaults to the Puppet environment for the node.
+
+* `softfail`: Optional Boolean. Whether to ignore libkv operation failures.
+
+  * When `true`, each libkv function will return a result object even when the
+    operation failed at the backend.
+  * When `false`, each libkv function will fail when the backend operation
+    failed.
+  * Defaults to `false`.
+
+#### Backend Configuration Entries
+
+This section describes the naming conventions for backends and the required
+configuration attributes.
+
+The name of each backend configuration entry in the `backends` Hash must
+conform to the following conventions:
+
+* Each name is a String.
+* Each name is necessarily unique, but more than one name can contain
+  the same backend configuration.  This is useful in the default
+  hiearchy in which you want subsets of defaults to use the same
+  configuration.
+* When the name begins with `default` it is part of the default hierarchy.
+
+  * `default.Class[<class>]` specifies the default backend configuration
+    for a specific Class resource.  The `Class[<class>]` portion of the
+    name is how the Class resource is represented in the Puppet catalog.
+    For example, for the `mymodule::myclass` Class, the appropriate backend
+    name will be `default.Class[Mymodule::Myclass]`.
+
+  * `default.<Defined type>[<instance>]` specifies the default
+    backend configuration for a specific Define resource.  The
+    `<Define type>[<instance>]` portion of the name is how the defined
+    resource is represented in the Puppet catalog.  For example, for the
+    `first` instance of the `mydefine` defined type, the appropriate
+    backend name will be `default.Mymodule::Mydefine[first]`.
+
+  * `default.<Define type>` specifies the default backend configuration
+    for all instances of a defined type.  The `<Define type>` portion
+    of the name is the first part of how a specific defined resource is
+    represented in the Puppet catalog.  For example, for all instances
+    of a `mydefine` Define, the appropriate backend name will be
+    `default.Mymodule::Mydefine`.
+
+  * `default.<application grouping>` specifies the default backend
+    configuration grouped logically per application.  It is useful
+    when the backend to be used is to be share among many classes.
+
+  * `default` specifies the default backend configuration when no
+    other `default.xxx` configuration matches the name of the resource
+    requesting a libkv operation via a `libkv` function.
+
+
+Each backend configuration Hash must contain `type` and `id` keys, where
+the (`type`,`id`) pair defines a unique configuration.
+
+* `type` must be unique across all backend plugins, including those
+  provided by other modules.
+* `id` must be unique for a each distinct configuration for a `type`
+* Other keys for configuration specific to the backend may also be present.
 
 ## File Store and Plugin
 

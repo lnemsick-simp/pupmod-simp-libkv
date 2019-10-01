@@ -29,9 +29,9 @@ Puppet::Functions.create_function(:'libkv::delete') do
   #       merged options Hash.
   #     * When absent and not specified in `libkv::options`, this function
   #       will look for a 'default.xxx' backend whose name matches the
-  #       catalog resource id of the calling Class, specific defined type
-  #       instance, or defined type.  If no match is found, it will use
-  #       the 'default' backend.
+  #       `resource` option.  This is typically the catalog resource id of the
+  #       calling Class, specific defined type instance, or defined type.
+  #       If no match is found, it will use the 'default' backend.
   #
   #   * `environment`: String.  Puppet environment to prepend to keys.
   #
