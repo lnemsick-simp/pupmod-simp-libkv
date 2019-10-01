@@ -173,7 +173,7 @@ $hosts.each |$host, $ip | {
 ```
 
 In hieradata, configure the backend with ``libkv::options`` Hash.  This example,
-will configure multiple isntances of libkv's file backend.
+will configure multiple instances of libkv's file backend.
 
 ```yaml
 # The backend configurations here will be inserted into libkv::options
@@ -223,7 +223,7 @@ libkv::options:
 ```
 
 Notice that we are explicitly setting the resource identifier in
-both the `libkv::put`` and `libkv::list` function calls and their resource
+both the `libkv::put` and `libkv::list` function calls and their resource
 identifiers match one of the backends in our hieradata. Using the resource
 identifiers allows us to use a default hierarchy to determine which backend to
 use.
@@ -239,10 +239,10 @@ The search within the default hierarchy is simple:
     resource strings.
 
 * Next look for a partial match of the form `default.<partial>`, where
-  partial is the part of the resource identifier prior to the '['.
+  partial is the part of the resource identifier prior to the `[`.
 
   * For example, `default.Mymodule::Mydefine` for all defines of type
-    mymodule::mydefine.
+    `mymodule::mydefine`.
 
 * Finally, if no match is found, default to a backend named `default`.
 
@@ -324,7 +324,7 @@ conform to the following conventions:
 
   * `default.<application grouping>` specifies the default backend
     configuration grouped logically per application.  It is useful
-    when the backend to be used is to be share among many classes.
+    when the backend to be used is to be shared among many classes.
 
   * `default` specifies the default backend configuration when no
     other `default.xxx` configuration matches the name of the resource

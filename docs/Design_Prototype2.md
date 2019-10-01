@@ -22,8 +22,8 @@
 
     * [Backend Configuration Entries](#backend-configuration-entries)
     * [Default Backend Selection](#default-backend-selection)
-    * [Example 1: Single libkv backend](#example-1:-single-libkv-backend)
-    * [Example 2: Multiple libkv backends](#example-2:-multiple-libkv-backends)
+    * [Example 1: Single libkv backend](#example-1--single-libkv-backend)
+    * [Example 2: Multiple libkv backends](#example-2--multiple-libkv-backends)
 
   * [libkv Puppet Functions](#libkv-puppet-functions)
 
@@ -469,7 +469,7 @@ conform to the following conventions:
 
   * `default.<application grouping>` specifies the default backend
     configuration grouped logically per application.  It is useful
-    when the backend to be used is to be share among many classes.
+    when the backend to be used is to be shared among many classes.
 
   * `default` specifies the default backend configuration when no
     other `default.xxx` configuration matches the name of the resource
