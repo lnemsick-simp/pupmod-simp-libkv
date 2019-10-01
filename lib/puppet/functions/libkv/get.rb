@@ -47,7 +47,8 @@ Puppet::Functions.create_function(:'libkv::get') do
   #
   #     * Required when `backend` is not specified and you want to be able
   #       to use more than the `default` backend.
-  #     * String should be resource as it would appear in the catalog
+  #     * String should be resource as it would appear in the catalog or
+  #       some application grouping id
   #
   #       * 'Class[<class>]' for a class, e.g.  'Class[Mymodule::Myclass]'
   #       * '<Defined type>[<instance>]' for a defined type instance, e.g.,
