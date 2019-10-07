@@ -15,9 +15,33 @@ Puppet::Functions.create_function(:'libkv::deletetree') do
   #
   #   * Key folder may not contain '/./' or '/../' sequences.
   #
-  # @param options Hash that specifies global libkv options and/or the specific
-  #   backend to use (with or without backend-specific configuration).
-  #   Will be merged with `libkv::options`.
+  # @param options libkv configuration that will be merged with
+  #   `libkv::options`.  All keys are optional.
+  #
+  # @option options [String] 'app_id'
+  #   Specifies an application name that can be used to identify which backend
+  #   configuration to use via fuzzy name matching, in the absence of the
+  #   `backend` option.
+  #
+  #     * More flexible option than `backend`.
+  #     * Useful for grouping together libkv function calls found in different
+  #       catalog resources.
+  #     * When specified and the `backend` option is absent, the backend will be
+  #       selected preferring a backend in the merged `backends` option whose
+  #       name exactly matches the `app_id`, followed by the longest backend
+  #       name that matches the beginning of the `app_id`, followed by the
+  #       `default` backend.
+  #     * When absent and the `backend` option is also absent, this function
+  #       will use the `default` backend.
+  #
+  # @option options [String] 'backend'
+  #   Definitive name of the backend to use.
+  #
+  #     * Takes precedence over `app_id`.
+  #     * When present, must match a key in the `backends` option of the
+  #       merged options Hash or the function will fail.
+  #     * When absent in the merged options, this function will select
+  #       the backend as described in the `app_id` option.
   #
   # @option options [Hash] 'backends'
   #   Hash of backend configurations
@@ -32,17 +56,6 @@ Puppet::Functions.create_function(:'libkv::deletetree') do
   #      * Other keys for configuration specific to the backend may also be
   #        present.
   #
-  # @option options [String] 'backend'
-  #   Name of the backend to use.
-  #
-  #     * When present, must match a key in the `backends` option of the
-  #       merged options Hash.
-  #     * When absent and not specified in `libkv::options`, this function
-  #       will look for a 'default.xxx' backend whose name matches the
-  #       `resource` option.  This is typically the catatlog resource id of the
-  #       calling Class, specific defined type instance, or defined type.
-  #       If no match is found, it will use the 'default' backend.
-  #
   # @option options [String] 'environment'
   #   Puppet environment to prepend to keys.
   #
@@ -51,23 +64,6 @@ Puppet::Functions.create_function(:'libkv::deletetree') do
   #     * Should only be set to an empty string when the key being accessed is
   #       truly global.
   #     * Defaults to the Puppet environment for the node.
-  #
-  # @option options [String] 'resource'
-  #   Name of the Puppet resource initiating this libkv operation
-  #
-  #     * Required when `backend` is not specified and you want to be able
-  #       to use more than the `default` backend.
-  #     * String should be resource as it would appear in the catalog or
-  #       some application grouping id
-  #
-  #       * 'Class[<class>]' for a class, e.g.  'Class[Mymodule::Myclass]'
-  #       * '<Defined type>[<instance>]' for a defined type instance, e.g.,
-  #         'Mymodule::Mydefine[myinstance]'
-  #
-  #     * Catalog resource id cannot be reliably determined automatically.
-  #       Appropriate scope is not necessarily available when a libkv function
-  #       is called within any other function.  This is problematic for heavily
-  #       used Puppet built-in functions such as `each`.
   #
   # @option options [Boolean] 'softfail'
   #   Whether to ignore libkv operation failures.
@@ -90,7 +86,10 @@ Puppet::Functions.create_function(:'libkv::deletetree') do
   #   options
   #
   # @example Delete a key folder using the default backend
-  #   libkv::delete("hosts")
+  #   libkv::deletetree("hosts")
+  #
+  # @example Delete a key folder using the backend servicing an appliction id
+  #   libkv::deletetree("hosts", { 'app_id' => 'myapp' })
   #
   dispatch :deletetree do
     required_param 'String[1]', :keydir
@@ -107,10 +106,9 @@ Puppet::Functions.create_function(:'libkv::deletetree') do
     # determine backend configuration using options, `libkv::options`,
     # and the list of backends for which plugins have been loaded
     begin
-      resource = options.has_key?('resource') ?  options['resource'] : '__libkv_unknown__'
       catalog = closure_scope.find_global_scope.catalog
       merged_options = call_function( 'libkv::support::config::merge', options,
-        catalog.libkv.backends, resource)
+        catalog.libkv.backends)
     rescue ArgumentError => e
       msg = "libkv Configuration Error for libkv::deletetree with keydir='#{keydir}': #{e.message}"
       raise ArgumentError.new(msg)

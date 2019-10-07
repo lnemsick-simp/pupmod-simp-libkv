@@ -7,15 +7,15 @@ describe 'libkv::put' do
   before(:each) do
     # set up configuration for the file plugin
     @tmpdir = Dir.mktmpdir
-    @root_path_test_file = File.join(@tmpdir, 'libkv', 'test_file')
-    @root_path_default_class = File.join(@tmpdir, 'libkv', 'default_class')
-    @root_path_default   = File.join(@tmpdir, 'libkv', 'default')
+    @root_path_test_file      = File.join(@tmpdir, 'libkv', 'test_file')
+    @root_path_default_app_id = File.join(@tmpdir, 'libkv', 'default_app_id')
+    @root_path_default        = File.join(@tmpdir, 'libkv', 'default')
     options_base = {
       'environment' => 'production',
       'backends'    => {
         # will use failer plugin for catastrophic error cases, because
         # it is badly behaved and raises exceptions on all operations
-       'test_failer'  => {
+       'test_failer' => {
           'id'               => 'test',
           'type'             => 'failer',
           'fail_constructor' => false  # true = raise in constructor
@@ -26,22 +26,22 @@ describe 'libkv::put' do
           'type'      => 'file',
           'root_path' => @root_path_test_file
         },
-        'default.Class[Mymodule::Myclass]'  => {
-          'id'        => 'default_class',
+        'myapp'      => {
+          'id'        => 'default_app_id',
           'type'      => 'file',
-          'root_path' => @root_path_default_class
+          'root_path' => @root_path_default_app_id
         },
-        'default'  => {
+        'default'    => {
           'id'        => 'default',
           'type'      => 'file',
           'root_path' => @root_path_default
         }
       }
     }
-    @options_failer        = options_base.merge ({ 'backend' => 'test_failer' } )
-    @options_test_file     = options_base.merge ({ 'backend' => 'test_file' } )
-    @options_default_class = options_base.merge ({ 'resource' => 'Class[Mymodule::Myclass]' } )
-    @options_default       = options_base
+    @options_failer         = options_base.merge ({ 'backend' => 'test_failer' } )
+    @options_test_file      = options_base.merge ({ 'backend' => 'test_file' } )
+    @options_default_app_id = options_base.merge ({ 'app_id'  => 'myapp10' } )
+    @options_default        = options_base
   end
 
   after(:each) do
@@ -69,7 +69,7 @@ describe 'libkv::put' do
       end
     end
 
-    it 'should store key,value,metadata tuple to the default backend in options when resource unspecified' do
+    it 'should store key,value,metadata tuple to the default backend in options when app_id unspecified' do
       is_expected.to run.with_params(key, value , metadata, @options_default).
         and_return(true)
 
@@ -91,11 +91,11 @@ describe 'libkv::put' do
       expect( File.exist?(key_file) ).to be true
     end
 
-    it 'should store key,value,metadata tuple to the default backend for resource' do
-      is_expected.to run.with_params(key, value , metadata, @options_default_class).
+    it 'should store key,value,metadata tuple to the default backend for app_id' do
+      is_expected.to run.with_params(key, value , metadata, @options_default_app_id).
         and_return(true)
 
-      key_file = File.join(@root_path_default_class, 'production', key)
+      key_file = File.join(@root_path_default_app_id, 'production', key)
       expect( File.exist?(key_file) ).to be true
     end
 

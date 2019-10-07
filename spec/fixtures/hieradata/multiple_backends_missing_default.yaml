@@ -21,23 +21,12 @@
 
     # Hash of backend configuration to be used to lookup the appropriate
     # backend to use in libkv functions.
-    #
-    #  * More than one backend configuration name can use the same backend
-    #    configuration.  But each distinct backend configuration must have
-    #    a unique (id,type) pair.
-    #  * Individual resources can override the default by specifying
-    #    a `backend` key in its backend options hash.
     backends:
-      # mymodule::myclass Class resource
-      "default.Class[Mymodule::Myclass]":       "%{alias('libkv::backend::file')}"
+      # backend for a specific myapp application
+      "myapp1_special_snowflake": "%{alias('libkv::backend::file')}"
 
-      # specific instance of mymodule::mydefine defined type
-      "default.Mymodule::Mydefine[myinstance]": "%{alias('libkv::backend::alt_file')}"
+      # backend for a myapp1* subset of myapp applications
+      "myapp1":                   "%{alias('libkv::backend::file')}"
 
-      # all mymodule::mydefine instances not matching a specific instance default
-      "default.Mymodule::Mydefine":             "%{alias('libkv::backend::file')}"
-
-# Missing default
-#      # all other resources
-#      "default":                                "%{alias('libkv::backend::file')}"
-
+      # backend for remaining myapp* applications
+      "myapp":                    "%{alias('libkv::backend::alt_file')}"

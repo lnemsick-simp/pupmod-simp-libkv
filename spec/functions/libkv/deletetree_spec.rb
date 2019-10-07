@@ -7,15 +7,15 @@ describe 'libkv::deletetree' do
   before(:each) do
     # set up configuration for the file plugin
     @tmpdir = Dir.mktmpdir
-    @root_path_test_file = File.join(@tmpdir, 'libkv', 'test_file')
-    @root_path_default_class = File.join(@tmpdir, 'libkv', 'default_class')
-    @root_path_default   = File.join(@tmpdir, 'libkv', 'default')
+    @root_path_test_file      = File.join(@tmpdir, 'libkv', 'test_file')
+    @root_path_default_app_id = File.join(@tmpdir, 'libkv', 'default_app_id')
+    @root_path_default        = File.join(@tmpdir, 'libkv', 'default')
     options_base = {
       'environment' => 'production',
       'backends'    => {
         # will use failer plugin for catastrophic error cases, because
         # it is badly behaved and raises exceptions on all operations
-       'test_failer'  => {
+       'test_failer' => {
           'id'               => 'test',
           'type'             => 'failer',
           'fail_constructor' => false  # true = raise in constructor
@@ -26,22 +26,22 @@ describe 'libkv::deletetree' do
           'type'      => 'file',
           'root_path' => @root_path_test_file
         },
-        'default.Class[Mymodule::Myclass]'  => {
-          'id'        => 'default_class',
+        'myapp'      => {
+          'id'        => 'default_app_id',
           'type'      => 'file',
-          'root_path' => @root_path_default_class
+          'root_path' => @root_path_default_app_id
         },
-        'default'  => {
+        'default'    => {
           'id'        => 'default',
           'type'      => 'file',
           'root_path' => @root_path_default
         }
       }
     }
-    @options_failer        = options_base.merge ({ 'backend' => 'test_failer' } )
-    @options_test_file     = options_base.merge ({ 'backend' => 'test_file' } )
-    @options_default_class = options_base.merge ({ 'resource' => 'Class[Mymodule::Myclass]' } )
-    @options_default       = options_base
+    @options_failer         = options_base.merge ({ 'backend' => 'test_failer' } )
+    @options_test_file      = options_base.merge ({ 'backend' => 'test_file' } )
+    @options_default_app_id = options_base.merge ({ 'app_id'  => 'myapp10' } )
+    @options_default        = options_base
   end
 
   after(:each) do
@@ -55,7 +55,7 @@ describe 'libkv::deletetree' do
 
   context 'without libkv::options' do
     let(:test_file_env_root_dir) { File.join(@root_path_test_file, 'production') }
-    let(:default_class_env_root_dir) { File.join(@root_path_default_class, 'production') }
+    let(:default_app_id_env_root_dir) { File.join(@root_path_default_app_id, 'production') }
     let(:default_env_root_dir) { File.join(@root_path_default, 'production') }
 
     it 'should delete an existing, non-empty key folder in a specific backend in options' do
@@ -68,7 +68,7 @@ describe 'libkv::deletetree' do
       expect( Dir.exist?(actual_keydir) ).to be false
     end
 
-    it 'should delete an existing key folder in the default backend in options when resource unspecified' do
+    it 'should delete an existing key folder in the default backend in options when app_id unspecified' do
       actual_keydir = File.join(default_env_root_dir, keydir)
       FileUtils.mkdir_p(actual_keydir)
       key_file = File.join(actual_keydir, 'key')
@@ -78,13 +78,13 @@ describe 'libkv::deletetree' do
       expect( Dir.exist?(actual_keydir) ).to be false
     end
 
-    it 'should delete an existing key folder in the default backend for resource' do
-      actual_keydir = File.join(default_class_env_root_dir, keydir)
+    it 'should delete an existing key folder in the default backend for app_id' do
+      actual_keydir = File.join(default_app_id_env_root_dir, keydir)
       FileUtils.mkdir_p(actual_keydir)
       key_file = File.join(actual_keydir, 'key')
       FileUtils.touch(key_file)
 
-      is_expected.to run.with_params(keydir, @options_default_class).and_return(true)
+      is_expected.to run.with_params(keydir, @options_default_app_id).and_return(true)
       expect( Dir.exist?(actual_keydir) ).to be false
     end
 
@@ -103,7 +103,7 @@ describe 'libkv::deletetree' do
         'auto_default', environment, keydir)
       FileUtils.mkdir_p(File.dirname(actual_keydir))
 
-      is_expected.to run.with_params(keydir, @options_default_class).and_return(true)
+      is_expected.to run.with_params(keydir, @options_default_app_id).and_return(true)
       expect( Dir.exist?(actual_keydir) ).to be false
     end
 

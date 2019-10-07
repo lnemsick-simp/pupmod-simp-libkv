@@ -1,30 +1,35 @@
-class libkv_test::delete(
-  Hash $libkv_options = { 'resource' => 'Class[Libkv_test::Delete]' }
-) {
+class libkv_test::delete inherits libkv_test::params
+{
+  # Delete keys without metadata for the specified app_id
+  $::libkv_test::params::key_value_pairs.each |$key, $value| {
+    libkv::delete($key, $::libkv_test::params::libkv_options)
+  }
 
-  libkv::delete('from_class/boolean', $libkv_options)
-  libkv::delete('from_class/string', $libkv_options)
-  libkv::delete('from_class/integer', $libkv_options)
-  libkv::delete('from_class/float', $libkv_options)
-  libkv::delete('from_class/array_strings', $libkv_options)
-  libkv::delete('from_class/array_integers', $libkv_options)
-  libkv::delete('from_class/hash', $libkv_options)
+  # Verify keys without metadata no longer exist for the specified app_id
+  $::libkv_test::params::key_value_pairs.each |$key, $value| {
+    libkv_test::assert_equal(
+      libkv::exists($key, $::libkv_test::params::libkv_options),
+      false,
+      "libkv::exists('${key}')"
+    )
+  }
 
-  libkv_test::assert_equal(libkv::exists('from_class/boolean', $libkv_options), false, "libkv::exists('from_class/boolean')")
-  libkv_test::assert_equal(libkv::exists('from_class/string', $libkv_options), false, "libkv::exists('from_class/string')")
-  libkv_test::assert_equal(libkv::exists('from_class/integer', $libkv_options), false, "libkv::exists('from_class/integer')")
-  libkv_test::assert_equal(libkv::exists('from_class/float', $libkv_options), false, "libkv::exists('from_class/float')")
-  libkv_test::assert_equal(libkv::exists('from_class/array_strings', $libkv_options), false, "libkv::exists('from_class/array_strings')")
-  libkv_test::assert_equal(libkv::exists('from_class/array_integers', $libkv_options), false, "libkv::exists('from_class/array_integers')")
-  libkv_test::assert_equal(libkv::exists('from_class/hash', $libkv_options), false, "libkv::exists('from_class/hash')")
+  # Verify keys with metadata still exist for the specified app_id
+  $::libkv_test::params::key_value_pairs.each |$key, $value| {
+    libkv_test::assert_equal(
+      libkv::exists("${key}_with_meta", $::libkv_test::params::libkv_options),
+      true,
+      "libkv::exists('${key}_with_meta')"
+    )
+  }
 
-  libkv_test::assert_equal(libkv::exists('from_class/boolean_with_meta', $libkv_options), true, "libkv::exists('from_class/boolean_with_meta')")
-  libkv_test::assert_equal(libkv::exists('from_class/string_with_meta', $libkv_options), true, "libkv::exists('from_class/string_with_meta')")
-  libkv_test::assert_equal(libkv::exists('from_class/integer_with_meta', $libkv_options), true, "libkv::exists('from_class/integer_with_meta')")
-  libkv_test::assert_equal(libkv::exists('from_class/float_with_meta', $libkv_options), true, "libkv::exists('from_class/float_with_meta')")
-  libkv_test::assert_equal(libkv::exists('from_class/array_strings_with_meta', $libkv_options), true, "libkv::exists('from_class/array_strings_with_meta')")
-  libkv_test::assert_equal(libkv::exists('from_class/array_integers_with_meta', $libkv_options), true, "libkv::exists('from_class/array_integers_with_meta')")
-  libkv_test::assert_equal(libkv::exists('from_class/hash_with_meta', $libkv_options), true, "libkv::exists('from_class/hash_with_meta')")
-
-  libkv_test::assert_equal(libkv::exists('from_class/boolean_from_pfunction', $libkv_options), true, "libkv::exists('from_class/boolean_from_pfunction')")
+  # Verify the key added in own Puppet function call for the specified app_id still exists
+  libkv_test::assert_equal(
+    libkv::exists(
+      "${::libkv_test::params::test_keydir}/boolean_from_pfunction",
+      $::libkv_test::params::libkv_options
+    ),
+    true,
+    "libkv::exists('#{::libkv_test::params::test_keydir}}/boolean_from_pfunction')"
+  )
 }

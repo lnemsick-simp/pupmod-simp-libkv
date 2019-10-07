@@ -16,6 +16,7 @@
   * [Single Backend Example](#single-backend-example)
   * [Multiple Backends Example](#multiple-backends-example)
   * [Binary Value Example](#binary-value-example)
+  * [Auto-Default Backend](#auto-default-backend)
   * [libkv Configuration Reference](#libkv-configuration-reference)
 * [File Store and Plugin](#file-store-and-plugin)
 * [Limitations](#limitations)
@@ -48,7 +49,7 @@ This module provides
 
 * a standard Puppet language API (functions) for using key/value stores
 
-  * API modeled after https://github.com/docker/libkv#interface.
+  * The API is modeled after https://github.com/docker/libkv#interface.
   * See [REFERENCE.md](REFERENCE.md) for more details on the available
     functions.
 
@@ -69,10 +70,10 @@ If you find any issues, they may be submitted to our
 
 The following terminology will be used throughout this document:
 
-* backend - A specific key/value store, e.g., Consul, Etcd, Zookeeper, local
-  files
+* backend - A specific key/value store, e.g., files on a local filesystem,
+  Consul, Etcd, Zookeeper
 * plugin - Ruby software that interfaces with a specific backend to
-  affect the operations requested in libkv functions.
+  affect the operations requested in libkv Puppet functions.
 * plugin instance - Instance of the plugin that handles a unique backend
   configuration.
 * plugin adapter - Ruby software that loads, selects, and executes the
@@ -82,21 +83,22 @@ The following terminology will be used throughout this document:
 
 Using `libkv` is simple:
 
-* Use `libkv` functions to store and retrieve key/value pairs in your
-  Puppet code.
+* Use `libkv` functions to store and retrieve key/value pairs in your Puppet
+  code.
 * Configure the backend(s) to use in Hieradata.
 * Reconfigure the backend(s) in Hieradata, as your needs change.  No changes
   to your Puppet code will be required.
 
 The backend configuration of `libkv` can be as simple as you want (one backend)
-or complex (multiple backends with defaults for specific classes, defined type
-instances or defined types).  Examples of both scenarios will be shown in this
-section.
+or complex (multiple backends servicing different applications).  Examples of
+both scenarios will be shown in this section, along with a configuration
+reference.
 
 ### Single Backend Example
 
-This example will store and retrieve host information using libkv function signatures
-and configuration that support a single backend.
+This example will store and retrieve host information using libkv function
+signatures that assume the default backend and hieradata that only configures
+the default backend.
 
 To store a node's hostname and IP address:
 
@@ -115,28 +117,18 @@ $hosts.each |$host, $info | {
 }
 ```
 
-In hieradata, configure the backend with ``libkv::options`` Hash.  This example,
-will configure libkv's file backend.
+In hieradata, configure the default backend in the ``libkv::options`` Hash.  This
+example, will configure libkv's file backend.
 
 ```yaml
 libkv::options:
-  # global options
-  # The environment name to prepend to each key.
-  environment: "%{server_facts.environment}"
-  # Whether to return null values in lieu of failing when a backend
-  # operation fails.  You almost always want this to be false.
-  softfail: false
 
-  # We only have one backend, so set it explicitly to our single backend.
-  # (This is omitted when we are using multiple backends.)
-  backend: default
-
-  # Required Hash of backend configurations.  We have only 1 entry.
+  # Hash of backend configurations.
+  # - We have only the required 'default' entry which will apply to
+  #   all libkv calls.
   backends:
-    # This key matches the value of 'backend' above.
     default:
-      # This is the plugin's advertised type and must be unique across all
-      # plugins.  The file plugin for libkv has a type of 'file'.
+      # This is the advertised type for libkv's file plugin.
       type: file
       # This is a unique id for this configuration of the 'file' plugin.
       id: file
@@ -148,22 +140,24 @@ libkv::options:
 
 ### Multiple Backends Example
 
-This example will store and retrieve host information using libkv function signatures
-and configuration that support a multiple backends.  The function signatures and
-configuration are a little more complicated, but still relatively straightforward
-to understand.
+This example will store and retrieve host information using libkv function
+signatures that request a backend based on an application id and multi-backend
+hieradata that supports the request.  The function signatures and hieradata are
+a little more complicated, but still relatively straightforward to understand.
 
-To store a node's hostname and IP address:
+To store a node's hostname and IP address using the backend servicing `myapp1`:
 
 ```puppet
-$libkv_options = 'Class[Mymodule::Myclass]'
+$libkv_options = { 'app_id' => 'myapp1' }
 $empty_metadata = {}
 libkv::put("hosts/${facts['clientcert']}", $facts['ipaddress'], $empty_metadata, $libkv_options)
 ```
-To create a hosts file using the list of stored host information:
+
+To create a hosts file using the list of stored host information using the
+backend servicing `myapp1`:
 
 ```puppet
-$libkv_options = 'Class[Mymodule::Myclass]'
+$libkv_options = { 'app_id' => 'myapp1' }
 $hosts = libkv::list('hosts', $libkv_options)
 $hosts.each |$host, $info | {
   host { $host:
@@ -172,89 +166,99 @@ $hosts.each |$host, $info | {
 }
 ```
 
-In hieradata, configure the backend with ``libkv::options`` Hash.  This example 
-will configure multiple instances of libkv's file backend.
+In hieradata, configure multiple backends in the ``libkv::options`` Hash.
+This example will configure multiple instances of libkv's file backend.
 
 ```yaml
 # The backend configurations here will be inserted into libkv::options
 # below via the alias function.
-libkv::backend::file:
-  type: file
-  id: file
 
-  # plugin-specific configuration
+libkv::backend::file_default:
+  type: file
+  id: default
   root_path: "/var/simp/libkv/file"
-  lock_timeout_seconds: 30
-  user: puppet
-  group: puppet
 
-libkv::backend::alt_file:
-  id: alt_file
+libkv::backend::file_myapp:
   type: file
-  root_path: "/some/other/path"
-  user: otheruser
-  group: othergroup
+  id: myapp
+  root_path: "/path/to/myapp"
+
+libkv::backend::file_yourapp:
+  type: file
+  id: yourapp
+  root_path: "/path/to/yourapp"
+
 
 libkv::options:
-  # global options
-  environment: "%{server_facts.environment}"
-  softfail: false
-
-  # Hash of backend configuration to be used to lookup the appropriate
-  # backend to use in libkv functions.
-  #
-  #  * More than one backend configuration name can use the same backend
-  #    configuration.  But each distinct backend configuration must have
-  #    a unique (id,type) pair.
-  #  * Individual resources can override the default by specifying
-  #    a `backend` key in its backend options hash.
+  # Hash of backend configurations.
+  # * Includes application-specific backends and the required default backend.
+  # * libkv will use the appropriate backend for each libkv function call.
   backends:
-    # mymodule::myclass Class resource
-    "default.Class[Mymodule::Myclass]":       "%{alias('libkv::backend::file')}"
+    # backend for specific myapp application
+    "myapp_special_snowflake": "%{alias('libkv::backend::file_default')}"
 
-    # specific instance of mymodule::mydefine defined type
-    "default.Mymodule::Mydefine[myinstance]": "%{alias('libkv::backend::file')}"
+    # backend for remaining myapp* applications, including myapp1
+    "myapp":                   "%{alias('libkv::backend::file_myapp')}"
 
-    # all mymodule::mydefine instances not matching a specific instance default
-    "default.Mymodule::Mydefine":             "%{alias('libkv::backend::alt_file')}"
+    # backend for all yourapp* applications
+    "yourapp":                 "%{alias('libkv::backend::file_yourapp')}"
 
-    # all other resources
-    "default":                                "%{alias('libkv::backend::file')}"
+    # required default backend
+    "default":                 "%{alias('libkv::backend::file_default')}"
 ```
 
-Notice that we are explicitly setting the resource identifier in
-both the `libkv::put` and `libkv::list` function calls and their resource
-identifiers match one of the backends in our hieradata. Using the resource
-identifiers allows us to use a default hierarchy to determine which backend to
-use.
+In this example, we are setting the application identifier to `myapp1` in
+our libkv function calls.  libkv selects `myapp` as the backend to use for
+`myapp1` using the following simple search algorithm:
 
-The search within the default hierarchy is simple:
+* First, it looks for a backend named for the application id.
+* Next, it looks for the longest backend name matching the start of the
+  application id.
+* Finally, if no match is found, it defaults to a backend named `default`.
 
-* First look for an exact match of a backend named `default.<resource>`.
+### Binary Value Example
 
-  * For example `default.Class[Mymodule::Myclass]` or
-    `default.Mymodule::Mydefine[someinstance]`.
-  * They don't have to be actual Puppet resource strings, but, depending
-    upon your application, may make more sense if they are actual Puppet
-    resource strings.
+libkv is able to store and retrieve binary values, provided the Puppet code
+uses the appropriate configuration and functions/types for binary data.
 
-* Next look for a partial match of the form `default.<partial>`, where
-  partial is the part of the resource identifier prior to the `[`.
+  * **IMPORTANT**:  In Puppet 5, be sure to turn on `--rich_data` for both the
+    master and agent in order to ensure correct serialization/deserialization
+    of the `Binary` Puppet type.
 
-  * For example, `default.Mymodule::Mydefine` for all defines of type
-    `mymodule::mydefine`.
+Below is an example of using libkv for a binary value.
 
-* Finally, if no match is found, default to a backend named `default`.
+To store the content of a generated keytab file:
+
+```puppet
+# Load in the binary content from a file.  Returns a Binary Puppet type.
+$original_binary_content = binary_file('/path/to/keytabs/app.keytab')
+
+# Set a key/value pair with the binary content
+libkv::put('app/keytab', $original_binary_content)
+```
+
+To retrieve the keytab binary content and use it in a `file` resource:
+
+```puppet
+# Retrieve a binary value from a key/value store and set a Binary variable
+$retrieved_result = libkv::get('app/keytab')
+$retrieved_binary_content = Binary.new($retrieved_result['value'], '%r')
+
+# Persist binary data to another file
+file { '/different/path/to/keytabs/app.keytab':
+  content => $retrieved_binary_content
+}
+
+```
 
 ### Auto-Default Backend
 
 libkv is intended to be configured via ``libkv::options`` and any
 application-specific configuration passed to the libkv Puppet functions.
 However, to facilitate rollout of libkv capabilities, (specifically
-use of libkv internally in ``simplib::passgen``), when `libkv::options``
-is not set in hieradata, libkv will automatically configure and use
-the libkv file store.  This configuration is equivalent to the following
-hieradata:
+use of libkv internally in ``simplib::passgen``), when ``libkv::options``
+is not set in hieradata, libkv will automatically use the libkv file store with
+the configuration that is equivalent to the following hieradata:
 
 ```yaml
 libkv::options:
@@ -267,31 +271,6 @@ libkv::options:
       id: auto_default
 ```
 
-### Binary Value Example
-
-libkv is able to store and retrieve binary values, provided the Puppet code
-uses the appropriate functions/types for binary data.  Here is an example
-of such Puppet code:
-
-```puppet
-# Load in the binary content from a file.  Returns a Binary Puppet type.
-$original_binary_content = binary_file('/path/to/keytabs/app.keytab')
-
-# Set a key/value pair with the binary content
-libkv::put('app/keytab', $original_binary_content)
-
-# Retrieve a binary value from a key/value store and set a Binary variable
-$retrieved_result = libkv::get('app/keytab')
-$retrieved_binary_content = Binary.new($retrieved_result['value'], '%r')
-
-# Persist binary data to another file
-file { '/different/path/to/keytabs/app.keytab':
-  content => $retrieved_binary_content
-}
-
-```
-
-
 ### libkv Configuration Reference
 
 The libkv configuration used for each libkv function call is comprised of
@@ -301,28 +280,47 @@ is executed in a fashion to ensure the function-provided options take
 precedence over the `libkv::options` Hiera values.
 
 The merged libkv configuration contains global and backend-specific
-configurations. The primary keys in this Hash are as follows:
+configurations, along with an optional application identifier. The primary
+keys in this Hash are as follows:
+
+* `app_id`: Optional String in libkv function calls, only. Specifies an
+  application name that can be used to identify which backend configuration
+  to use via fuzzy name matching, in the absence of the `backend` option.
+  (See [Backend Selection](#backend-selection)).
+
+  * More flexible option than `backend`.
+  * Useful for grouping together libkv function calls found in different
+    catalog resources.
+
+* `backend`: Optional String. Specifies a definitive backend configuration
+  to use.
+
+  * Takes precedence over `app_id`.
+  * When present, must match a key in `backends` and will be used unequivocally.
+
+    * If that backend does not exist in `backends`, the libkv function will fail.
+
+  * When absent, the backend configuration will be selected from the set of
+    entries in `backends`, using the `app_id` option if specified.
+    (See [Backend Selection](#backend-selection)).
 
 * `backends`: Required Hash. Specifies backend configurations.  Each key
-   is the name of a backend configuration and its value contains the
-   corresponding configuration Hash.
+  is the name of a backend configuration and its value contains the
+  corresponding configuration Hash.
 
-* `backend`: Optional String. Specifies a specific backend configuration
-   to use.
-
-   * When present, must match a key in `backends`.
-   * When absent, the backend configuration will be selected from the set of
-     default entries in `backends`, based on the name of the catalog resource
-     requesting a libkv operation.  
-     (See [Default Backend Selection](#default-backend-selection)).
+  * Each key is a String.
+  * Must include a 'default' key.
+  * More than one key can use the same backend configuration.
+  * See [Backend Configuration Entries](#backend-configuration-entries)
+    for more details about a backend configuration Hash.
 
 * `environment`: Optional String.  Puppet environment to prepend to keys.
 
-   * When set to a non-empty string, it is prepended to the key or key folder
-     used in a backend operation.
-   * Should only be set to an empty string when the key being accessed is truly
-     global.
-   * Defaults to the Puppet environment for the node.
+  * When set to a non-empty string, it is prepended to the key or key folder
+    used in a backend operation.
+  * Should only be set to an empty string when the key being accessed is truly
+    global.
+  * Defaults to the Puppet environment for the node when absent.
 
 * `softfail`: Optional Boolean. Whether to ignore libkv operation failures.
 
@@ -330,59 +328,41 @@ configurations. The primary keys in this Hash are as follows:
     operation failed at the backend.
   * When `false`, each libkv function will fail when the backend operation
     failed.
-  * Defaults to `false`.
+  * Defaults to `false` when absent.
 
 #### Backend Configuration Entries
 
-This section describes the naming conventions for backends and the required
-configuration attributes.
-
-The name of each backend configuration entry in the `backends` Hash must
-conform to the following conventions:
-
-* Each name is a String.
-* Each name is necessarily unique, but more than one name can contain
-  the same backend configuration.  This is useful in the default
-  hierarchy in which you want subsets of defaults to use the same
-  configuration.
-* When the name begins with `default` it is part of the default hierarchy.
-
-  * `default.Class[<class>]` specifies the default backend configuration
-    for a specific Class resource.  The `Class[<class>]` portion of the
-    name is how the Class resource is represented in the Puppet catalog.
-    For example, for the `mymodule::myclass` Class, the appropriate backend
-    name will be `default.Class[Mymodule::Myclass]`.
-
-  * `default.<Defined type>[<instance>]` specifies the default
-    backend configuration for a specific Define resource.  The
-    `<Define type>[<instance>]` portion of the name is how the defined
-    resource is represented in the Puppet catalog.  For example, for the
-    `first` instance of the `mydefine` defined type, the appropriate
-    backend name will be `default.Mymodule::Mydefine[first]`.
-
-  * `default.<Define type>` specifies the default backend configuration
-    for all instances of a defined type.  The `<Define type>` portion
-    of the name is the first part of how a specific defined resource is
-    represented in the Puppet catalog.  For example, for all instances
-    of a `mydefine` Define, the appropriate backend name will be
-    `default.Mymodule::Mydefine`.
-
-  * `default.<application grouping>` specifies the default backend
-    configuration grouped logically per application.  It is useful
-    when the backend to be used is to be shared among many classes.
-
-  * `default` specifies the default backend configuration when no
-    other `default.xxx` configuration matches the name of the resource
-    requesting a libkv operation via a `libkv` function.
-
-
-Each backend configuration Hash must contain `type` and `id` keys, where
-the (`type`,`id`) pair defines a unique configuration.
+Each backend configuration entry in `backends` is a Hash.  The Hash must
+contain `type` and `id` keys, where the (`type`,`id`) pair defines a unique
+configuration.
 
 * `type` must be unique across all backend plugins, including those
   provided by other modules.
-* `id` must be unique for a each distinct configuration for a `type`
+* `id` must be unique for a each distinct configuration for a `type`.
 * Other keys for configuration specific to the backend may also be present.
+
+#### Backend Selection
+
+The backend to use for a libkv Puppet function call will be determined from
+the merged libkv options Hash as follows:
+
+* If a specific backend is requested via the `backend` key in the merged libkv
+  options Hash, that backend will be selected.
+
+  * If that backend does not exist in `backends`, the libkv function will fail.
+
+* Otherwise, if an `app_id` option is specified in the merged libkv options
+  Hash and it matches a key in the `backends` Hash, exactly, that backend will
+  be selected.
+* Otherwise, if an `app_id` option is specified in the merged libkv options
+  Hash and it starts with the key in the `backends` Hash, that backend will be
+  selected.
+
+  * When multiple backends satisfy the 'start with' match, the backend with the
+    most matching characters is selected.
+
+* Otherwise, if the `app_id` option does not match any key in in the `backends`
+  Hash or is not present, the `default` backend will be selected.
 
 ## File Store and Plugin
 
@@ -392,21 +372,13 @@ and supports the following plugin-specific configuration parameters.
 
 * `root_path`: Root directory path for the key files
 
-  * User must ensure the parent directory of this file accessible to Puppet.
-  * Defaults to `/var/simp/libkv/file/<id>`
+  * Defaults to `/var/simp/libkv/file/<id>` when that directory can be created
+    or '<Puppet[:vardir]>/simp/libkv/<name>' otherwise.
 
 * `lock_timeout_seconds`: Maximum number of seconds to wait for an exclusive
-   file lock on a file modifying operation before failing the operation.
+  file lock on a file modifying operation before failing the operation.
 
   * Defaults to 5 seconds.
-
-* `user`: Username of owner for created directories and files.
-
-  *  Defaults to user executing code.
-
-* `group`: Group name for created directories and files.
-
-  * Defaults to group executing code
 
 ## Limitations
 
@@ -436,21 +408,23 @@ you follow the instructions in the next section.
 To create your own plugin
 
 * Create a `lib/puppet_x/libkv` directory within your store plugin module.
-* Copy `lib/puppet_x/libkv/plugin_template.rb` from the libkv modules into that
+* Copy `lib/puppet_x/libkv/plugin_template.rb` from the libkv module into that
   directory with a name `<your plugin name>_plugin.rb`.  For example,
   `nfs_file_plugin.rb`.
 * **READ** all the documentation in your plugin skeleton, paying close attention
   the `IMPORTANT NOTES` discussion.
-* Implement the body of each method as identified by a `FIXME`. Be sure to conform
-  to the API for the method.
-* Write unit tests for your plugin, using the unit tests for libkv's
-  file plugin, `spec/unit/puppet_x/libkv/file_plugin_spec.rb` as an example.
-  That test shows you how to instantiate an object of your plugin for
-  testing purpose.
-* Write acceptance tests for your plugin, using the acceptance tests
-  for libkv's file plugin, `spec/acceptances/suites/default/file_plugin_spec.rb`,
-  as an example.  That test uses a test module, `spec/support/libkv_test` that
-  exercises the the libkv API.
+* Implement the body of each method as identified by a `FIXME`. Be sure to
+  conform to the API for the method.
+* Write unit tests for your plugin, using the unit tests for libkv's file
+  plugin, `spec/unit/puppet_x/libkv/file_plugin_spec.rb` as an example.  That
+  test shows you how to instantiate an object of your plugin for testing
+  purposes.
+* Write acceptance tests for your plugin, using the acceptance tests for
+  libkv's file plugin, `spec/acceptances/suites/default/file_plugin_spec.rb`,
+  as an example.  That test uses a test module, `spec/support/libkv_test` to
+  exercise the the libkv API and verify its operation.
+* Document your plugin's type and configuration parameters in the README.md for
+  your store plugin module.
 
 ## libkv Development
 

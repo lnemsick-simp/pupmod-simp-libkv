@@ -3,25 +3,23 @@ require 'spec_helper'
 describe 'libkv::support::config::merge' do
 
   let(:backends) { [ 'file' ] }
-  let(:class_resource)           { 'Class[Mymodule::Myclass]' }
 
-  context 'libkv::options not specified' do
+  context 'libkv::options and app_id not specified' do
     let(:environment) { 'myenv' }
     it 'should return input config when config is fully-specified' do
       config = {
-        'backend'     => 'file',
+        'backend'     => 'default',
         'environment' => 'dev',
         'softfail'    => true,
         'backends'    => {
-          'file' => {
+          'default' => {
             'id'   => 'test',
             'type' => 'file'
           }
         }
       }
 
-      is_expected.to run.with_params(config, backends, class_resource).
-        and_return(config)
+      is_expected.to run.with_params(config, backends).and_return(config)
     end
 
     it "should add default 'backend' to merged config when missing" do
@@ -38,7 +36,7 @@ describe 'libkv::support::config::merge' do
       output_config = input_config.dup
       output_config['backend'] = 'default'
 
-      is_expected.to run.with_params(input_config, backends, class_resource).
+      is_expected.to run.with_params(input_config, backends).
         and_return(output_config)
     end
 
@@ -56,7 +54,7 @@ describe 'libkv::support::config::merge' do
       output_config = input_config.dup
       output_config['environment'] = environment
 
-      is_expected.to run.with_params(input_config, backends, class_resource).
+      is_expected.to run.with_params(input_config, backends).
         and_return(output_config)
     end
 
@@ -74,11 +72,11 @@ describe 'libkv::support::config::merge' do
       output_config = input_config.dup
       output_config['softfail'] = false
 
-      is_expected.to run.with_params(input_config, backends, class_resource).
+      is_expected.to run.with_params(input_config, backends).
         and_return(output_config)
     end
 
-    it "should add 'backends' with file backend default when backends missing" do
+    it "should add 'backends' with file backend auto-default when backends missing" do
       output_config = {
         'environment' => 'myenv',
         'softfail'    => false,
@@ -90,7 +88,7 @@ describe 'libkv::support::config::merge' do
           }
         }
       }
-      is_expected.to run.with_params({}, backends, class_resource).
+      is_expected.to run.with_params({}, backends).
         and_return(output_config)
     end
 
@@ -103,7 +101,7 @@ describe 'libkv::support::config::merge' do
           }
         }
       }
-      is_expected.to run.with_params(options, backends, class_resource).
+      is_expected.to run.with_params(options, backends).
         and_raise_error(ArgumentError,
         /libkv backend plugin 'does_not_exist' not available/)
     end
@@ -128,7 +126,7 @@ describe 'libkv::support::config::merge' do
         }
       }
 
-      is_expected.to run.with_params({}, backends, class_resource).
+      is_expected.to run.with_params({}, backends).
         and_return(output_config)
     end
 
@@ -164,7 +162,7 @@ describe 'libkv::support::config::merge' do
           }
         }
       }
-      is_expected.to run.with_params(input_config, backends, class_resource).
+      is_expected.to run.with_params(input_config, backends).
         and_return(output_config)
     end
 
@@ -172,86 +170,76 @@ describe 'libkv::support::config::merge' do
     it 'should fail when merged config is invalid' do
       input_config = { 'backend' => 'test' }
 
-      is_expected.to run.with_params(input_config, backends, class_resource).
+      is_expected.to run.with_params(input_config, backends).
         and_raise_error(ArgumentError,
         /No libkv backend 'test' with 'id' and 'type' attributes has been configured/)
     end
   end
 
-  context 'backend lookup using default hierarchy' do
-    context 'complete hierarchy specified' do
-      let(:hieradata) { 'multiple_backends' }
+  context 'backend lookup using app_id' do
+    let(:hieradata) { 'multiple_backends' }
 
-      # alias expanded version of libkv:options in multiple_backends.yaml
-      let(:libkv_options) { {
-        'environment' => 'myenv',
-        'softfail'    => false,
-        'backends'    => {
-          'default.Class[Mymodule::Myclass]' => {
-            'type'                 => 'file',
-            'id'                   => 'file',
-            'root_path'            => '/var/simp/libkv/file',
-            'lock_timeout_seconds' => 30
-          },
-          'default.Mymodule::Mydefine[myinstance]' => {
-            'type'       => 'file',
-            'id'        => 'alt_file',
-            'root_path' => '/some/other/path'
-          },
-          'default.Mymodule::Mydefine' => {
-            'type'                 => 'file',
-            'id'                   => 'file',
-            'root_path'            => '/var/simp/libkv/file',
-            'lock_timeout_seconds' => 30
-          },
-          'default' => {
-            'type'                 => 'file',
-            'id'                   => 'file',
-            'root_path'            => '/var/simp/libkv/file',
-            'lock_timeout_seconds' => 30
-          }
+    # alias expanded version of libkv:options in multiple_backends.yaml
+    let(:libkv_options) { {
+      'environment' => 'myenv',
+      'softfail'    => false,
+      'backends'    => {
+        'myapp1_special_snowflake' => {
+          'type'                 => 'file',
+          'id'                   => 'file',
+          'root_path'            => '/var/simp/libkv/file',
+          'lock_timeout_seconds' => 30
+        },
+        'myapp1' => {
+          'type'                 => 'file',
+          'id'                   => 'file',
+          'root_path'            => '/var/simp/libkv/file',
+          'lock_timeout_seconds' => 30
+        },
+        'myapp' => {
+          'type'      => 'file',
+          'id'        => 'alt_file',
+          'root_path' => '/some/other/path'
+        },
+        'default' => {
+          'type'                 => 'file',
+          'id'                   => 'file',
+          'root_path'            => '/var/simp/libkv/file',
+          'lock_timeout_seconds' => 30
         }
-      } }
+      }
+    } }
 
-      it "should set 'backend' to matching Class default" do
-        expected = libkv_options.dup
-        expected['backend'] = "default.#{class_resource}"
-        is_expected.to run.with_params({}, backends, class_resource).
-          and_return(expected)
-      end
-
-      it "should set 'backend' to matching Define-instance default" do
-        expected = libkv_options.dup
-        matching_instance =  'Mymodule::Mydefine[myinstance]'
-        expected['backend'] = 'default.Mymodule::Mydefine[myinstance]'
-        is_expected.to run.with_params({}, backends, matching_instance).
-          and_return(expected)
-      end
-
-      it "should set 'backend' to matching Define default" do
-        expected = libkv_options.dup
-        other_instance =  'Mymodule::Mydefine[yourinstance]'
-        expected['backend'] = 'default.Mymodule::Mydefine'
-        is_expected.to run.with_params({}, backends, other_instance).
-          and_return(expected)
-      end
-
-      it "should set 'backend' to default when no match is found" do
-        expected = libkv_options.dup
-        expected['backend'] = 'default'
-        is_expected.to run.with_params({}, backends, 'Class[Bob]').
-          and_return(expected)
-      end
+    it "should set 'backend' to match 'app_id' when exact match exists" do
+      expected = libkv_options.dup
+      expected['app_id'] = 'myapp1_special_snowflake'
+      expected['backend'] = 'myapp1_special_snowflake'
+      is_expected.to run.with_params({ 'app_id' => 'myapp1_special_snowflake' },
+        backends).and_return(expected)
     end
 
-    context "hierarchy missing 'default'" do
-      let(:hieradata) { 'multiple_backends_missing_default' }
+    it "should set 'backend' to longest match of 'app_id' beginning when start with match exists" do
+      expected = libkv_options.dup
+      expected['app_id'] = 'myapp10'
+      expected['backend'] = 'myapp1'
+      is_expected.to run.with_params({ 'app_id' => 'myapp10' }, backends).
+        and_return(expected)
+    end
 
-      it "should fail when no match is found and 'default' backend not specified" do
-        is_expected.to run.with_params({}, backends, 'Class[Bob]').
-        and_raise_error(ArgumentError,
-        /No libkv backend 'default' with 'id' and 'type' attributes has been configured/)
-      end
+    it "should set 'backend' to default when no 'app_id' start with match is found" do
+      expected = libkv_options.dup
+      expected['app_id'] = 'other_myapp'
+      expected['backend'] = 'default'
+      is_expected.to run.with_params({ 'app_id' => 'other_myapp' }, backends).
+        and_return(expected)
+    end
+
+    it "should ignore 'app_id' when 'backend' is specified" do
+      expected = libkv_options.dup
+      expected['app_id'] = 'myapp1'
+      expected['backend'] = 'default'
+      is_expected.to run.with_params({ 'app_id' => 'myapp1', 'backend' => 'default' },
+        backends).and_return(expected)
     end
   end
 

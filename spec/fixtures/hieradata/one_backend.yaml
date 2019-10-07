@@ -4,7 +4,7 @@ libkv::options:
   environment: "myenv"
   softfail: false
 
-  # we only have one backend, so set it explicitly
+  # we only have one backend, so might as well set it explicitly
   backend: default
 
   # Hash of backend configurations containing single entry

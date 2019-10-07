@@ -1,28 +1,49 @@
-class libkv_test::exists(
-  Hash $libkv_options = { 'resource' => "Class[Libkv_test::Exists]" }
+class libkv_test::exists inherits libkv_test::params
+{
+  # Check for keys with and without metadata for the specified app_id
+  $::libkv_test::params::key_value_pairs.each |$key, $value| {
+    libkv_test::assert_equal(
+      libkv::exists($key, $::libkv_test::params::libkv_options),
+      true,
+      "libkv::exists('${key}')"
+    )
 
-) {
+    libkv_test::assert_equal(
+      libkv::exists("${key}_with_meta", $::libkv_test::params::libkv_options),
+      true,
+      "libkv::exists('${key}_with_meta')"
+    )
+  }
 
-  # Do not try to put these in an each block...you will end up with
-  # the default backend because the class resource will be 'Class[main]'
 
-  libkv_test::assert_equal(libkv::exists('from_class/boolean', $libkv_options), true, "libkv::exists('from_class/boolean')")
-  libkv_test::assert_equal(libkv::exists('from_class/string', $libkv_options), true, "libkv::exists('from_class/string')")
-  libkv_test::assert_equal(libkv::exists('from_class/integer', $libkv_options), true, "libkv::exists('from_class/integer')")
-  libkv_test::assert_equal(libkv::exists('from_class/float', $libkv_options), true, "libkv::exists('from_class/float')")
-  libkv_test::assert_equal(libkv::exists('from_class/array_strings', $libkv_options), true, "libkv::exists('from_class/array_strings')")
-  libkv_test::assert_equal(libkv::exists('from_class/array_integers', $libkv_options), true, "libkv::exists('from_class/array_integers')")
-  libkv_test::assert_equal(libkv::exists('from_class/hash', $libkv_options), true, "libkv::exists('from_class/hash')")
+  # Check for the key added in own Puppet function call for the specified app_id
+  libkv_test::assert_equal(
+    libkv::exists(
+      "${::libkv_test::params::test_keydir}/boolean_from_pfunction",
+      $::libkv_test::params::libkv_options
+    ),
+    true,
+    "libkv::exists('#{::libkv_test::params::test_keydir}}/boolean_from_pfunction')"
+  )
 
-  libkv_test::assert_equal(libkv::exists('from_class/boolean_with_meta', $libkv_options), true, "libkv::exists('from_class/boolean_with_meta')")
-  libkv_test::assert_equal(libkv::exists('from_class/string_with_meta', $libkv_options), true, "libkv::exists('from_class/string_with_meta')")
-  libkv_test::assert_equal(libkv::exists('from_class/integer_with_meta', $libkv_options), true, "libkv::exists('from_class/integer_with_meta')")
-  libkv_test::assert_equal(libkv::exists('from_class/float_with_meta', $libkv_options), true, "libkv::exists('from_class/float_with_meta')")
-  libkv_test::assert_equal(libkv::exists('from_class/array_strings_with_meta', $libkv_options), true, "libkv::exists('from_class/array_strings_with_meta')")
-  libkv_test::assert_equal(libkv::exists('from_class/array_integers_with_meta', $libkv_options), true, "libkv::exists('from_class/array_integers_with_meta')")
-  libkv_test::assert_equal(libkv::exists('from_class/hash_with_meta', $libkv_options), true, "libkv::exists('from_class/hash_with_meta')")
+  # Check for the key added in own Puppet function call without the specified app_id.
+  # Should be in default backend but not the backend for the app_id.
+  $_empty_libkv_options = {}
+  libkv_test::assert_equal(
+    libkv::exists(
+      "${::libkv_test::params::test_keydir}/boolean_from_pfunction_no_app_id",
+      $_empty_libkv_options
+    ),
+    true,
+    "libkv::exists('#{::libkv_test::params::test_keydir}}/boolean_from_pfunction_no_appid') default backend"
+  )
 
-  libkv_test::assert_equal(libkv::exists('from_class/boolean_from_pfunction', $libkv_options), true, "libkv::exists('from_class/boolean_from_rfunction')")
-
-  libkv_test::assert_equal(libkv::exists('from_class/boolean_from_pfunction_no_resource', $libkv_options), false, "libkv::exists('from_class/boolean_from_pfunction')")
+  libkv_test::assert_equal(
+    libkv::exists(
+      "${::libkv_test::params::test_keydir}/boolean_from_pfunction_no_app_id",
+      $::libkv_test::params::libkv_options
+    ),
+    false,
+    "libkv::exists('#{::libkv_test::params::test_keydir}}/boolean_from_pfunction_no_appid') backend for app_id"
+  )
 }

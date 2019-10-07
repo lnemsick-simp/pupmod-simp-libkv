@@ -11,7 +11,7 @@
 * [`libkv::get`](#libkvget): Retrieves the value and any metadata stored at `key` from the  configured backend.
 * [`libkv::list`](#libkvlist): Returns a list of all keys in a folder.
 * [`libkv::put`](#libkvput): Sets the data at `key` to the specified `value` in the configured backend. Optionally sets metadata along with the `value`.
-* [`libkv::support::config::merge`](#libkvsupportconfigmerge): Create merged backend configuration and then validate it.  The `options` argument is merged with `libkv::options` Hiera and global libkv defa
+* [`libkv::support::config::merge`](#libkvsupportconfigmerge): Create merged backend configuration and then validate it.  The merge entails the following operations: * The `options` argument is merged wit
 * [`libkv::support::config::validate`](#libkvsupportconfigvalidate): Validate backend configuration
 * [`libkv::support::key::validate`](#libkvsupportkeyvalidate): Validates key conforms to the libkv key specification  * libkv key specification    * Key must contain only the following characters:      * 
 * [`libkv::support::load`](#libkvsupportload): Load libkv adapter and plugins and add libkv 'extension' to the catalog instance, if it is not present
@@ -30,6 +30,12 @@ Deletes a `key` from the configured backend.
 
 ```puppet
 libkv::delete("hosts/${facts['fqdn']}")
+```
+
+##### Delete a key using the backend servicing an application id
+
+```puppet
+libkv::delete("hosts/${facts['fqdn']}", { 'app_id' => 'myapp' })
 ```
 
 #### `libkv::delete(String[1] $key, Optional[Hash] $options)`
@@ -53,6 +59,12 @@ Raises:
 libkv::delete("hosts/${facts['fqdn']}")
 ```
 
+###### Delete a key using the backend servicing an application id
+
+```puppet
+libkv::delete("hosts/${facts['fqdn']}", { 'app_id' => 'myapp' })
+```
+
 ##### `key`
 
 Data type: `String[1]`
@@ -72,12 +84,32 @@ The key to remove. Must conform to the following:
 
 Data type: `Optional[Hash]`
 
-Hash that specifies global libkv options and/or the specific
-backend to use (with or without backend-specific configuration).
-Will be merged with `libkv::options`.
+libkv configuration that will be merged with
+`libkv::options`.  All keys are optional.
 
 Options:
 
+* **'app_id'** `String`: Specifies an application name that can be used to identify which backend
+configuration to use via fuzzy name matching, in the absence of the
+`backend` option.
+
+  * More flexible option than `backend`.
+  * Useful for grouping together libkv function calls found in different
+    catalog resources.
+  * When specified and the `backend` option is absent, the backend will be
+    selected preferring a backend in the merged `backends` option whose
+    name exactly matches the `app_id`, followed by the longest backend
+    name that matches the beginning of the `app_id`, followed by the
+    `default` backend.
+  * When absent and the `backend` option is also absent, this function
+    will use the `default` backend.
+* **'backend'** `String`: Definitive name of the backend to use.
+
+  * Takes precedence over `app_id`.
+  * When present, must match a key in the `backends` option of the
+    merged options Hash or the function will fail.
+  * When absent in the merged options, this function will select
+    the backend as described in the `app_id` option.
 * **'backends'** `Hash`: Hash of backend configurations
 
   * Each backend configuration in the merged options Hash must be
@@ -89,15 +121,6 @@ Options:
 
    * Other keys for configuration specific to the backend may also be
      present.
-* **'backend'** `String`: Name of the backend to use.
-
-  * When present, must match a key in the `backends` option of the
-    merged options Hash.
-  * When absent and not specified in `libkv::options`, this function
-    will look for a 'default.xxx' backend whose name matches the
-    `resource` option.  This is typically the catalog resource id of the
-    calling Class, specific defined type instance, or defined type.
-    If no match is found, it will use the 'default' backend.
 * **'environment'** `String`: Puppet environment to prepend to keys.
 
   * When set to a non-empty string, it is prepended to the key used in
@@ -105,21 +128,6 @@ Options:
   * Should only be set to an empty string when the key being accessed is
     truly global.
   * Defaults to the Puppet environment for the node.
-* **'resource'** `String`: Name of the Puppet resource initiating this libkv operation
-
-  * Required when `backend` is not specified and you want to be able
-    to use more than the `default` backend.
-  * String should be resource as it would appear in the catalog or
-    some application grouping id
-
-    * 'Class[<class>]' for a class, e.g.  'Class[Mymodule::Myclass]'
-    * '<Defined type>[<instance>]' for a defined type instance, e.g.,
-      'Mymodule::Mydefine[myinstance]'
-
-  * Catalog resource id cannot be reliably determined automatically.
-    Appropriate scope is not necessarily available when a libkv function
-    is called within any other function.  This is problematic for heavily
-    used Puppet built-in functions such as `each`.
 * **'softfail'** `Boolean`: Whether to ignore libkv operation failures.
 
   * When `true`, this function will return a result even when the
@@ -139,7 +147,13 @@ Deletes a whole folder from the configured backend.
 ##### Delete a key folder using the default backend
 
 ```puppet
-libkv::delete("hosts")
+libkv::deletetree("hosts")
+```
+
+##### Delete a key folder using the backend servicing an appliction id
+
+```puppet
+libkv::deletetree("hosts", { 'app_id' => 'myapp' })
 ```
 
 #### `libkv::deletetree(String[1] $keydir, Optional[Hash] $options)`
@@ -160,7 +174,13 @@ Raises:
 ###### Delete a key folder using the default backend
 
 ```puppet
-libkv::delete("hosts")
+libkv::deletetree("hosts")
+```
+
+###### Delete a key folder using the backend servicing an appliction id
+
+```puppet
+libkv::deletetree("hosts", { 'app_id' => 'myapp' })
 ```
 
 ##### `keydir`
@@ -182,12 +202,32 @@ The key folder to remove. Must conform to the following:
 
 Data type: `Optional[Hash]`
 
-Hash that specifies global libkv options and/or the specific
-backend to use (with or without backend-specific configuration).
-Will be merged with `libkv::options`.
+libkv configuration that will be merged with
+`libkv::options`.  All keys are optional.
 
 Options:
 
+* **'app_id'** `String`: Specifies an application name that can be used to identify which backend
+configuration to use via fuzzy name matching, in the absence of the
+`backend` option.
+
+  * More flexible option than `backend`.
+  * Useful for grouping together libkv function calls found in different
+    catalog resources.
+  * When specified and the `backend` option is absent, the backend will be
+    selected preferring a backend in the merged `backends` option whose
+    name exactly matches the `app_id`, followed by the longest backend
+    name that matches the beginning of the `app_id`, followed by the
+    `default` backend.
+  * When absent and the `backend` option is also absent, this function
+    will use the `default` backend.
+* **'backend'** `String`: Definitive name of the backend to use.
+
+  * Takes precedence over `app_id`.
+  * When present, must match a key in the `backends` option of the
+    merged options Hash or the function will fail.
+  * When absent in the merged options, this function will select
+    the backend as described in the `app_id` option.
 * **'backends'** `Hash`: Hash of backend configurations
 
   * Each backend configuration in the merged options Hash must be
@@ -199,15 +239,6 @@ Options:
 
    * Other keys for configuration specific to the backend may also be
      present.
-* **'backend'** `String`: Name of the backend to use.
-
-  * When present, must match a key in the `backends` option of the
-    merged options Hash.
-  * When absent and not specified in `libkv::options`, this function
-    will look for a 'default.xxx' backend whose name matches the
-    `resource` option.  This is typically the catatlog resource id of the
-    calling Class, specific defined type instance, or defined type.
-    If no match is found, it will use the 'default' backend.
 * **'environment'** `String`: Puppet environment to prepend to keys.
 
   * When set to a non-empty string, it is prepended to the key used in
@@ -215,21 +246,6 @@ Options:
   * Should only be set to an empty string when the key being accessed is
     truly global.
   * Defaults to the Puppet environment for the node.
-* **'resource'** `String`: Name of the Puppet resource initiating this libkv operation
-
-  * Required when `backend` is not specified and you want to be able
-    to use more than the `default` backend.
-  * String should be resource as it would appear in the catalog or
-    some application grouping id
-
-    * 'Class[<class>]' for a class, e.g.  'Class[Mymodule::Myclass]'
-    * '<Defined type>[<instance>]' for a defined type instance, e.g.,
-      'Mymodule::Mydefine[myinstance]'
-
-  * Catalog resource id cannot be reliably determined automatically.
-    Appropriate scope is not necessarily available when a libkv function
-    is called within any other function.  This is problematic for heavily
-    used Puppet built-in functions such as `each`.
 * **'softfail'** `Boolean`: Whether to ignore libkv operation failures.
 
   * When `true`, this function will return a result even when the
@@ -250,6 +266,14 @@ Returns whether the `key` exists in the configured backend.
 
 ```puppet
 if libkv::exists("hosts/${facts['fqdn']}") {
+   notify { "hosts/${facts['fqdn']} exists": }
+}
+```
+
+##### Check for the existence of a key in the backend servicing an application id
+
+```puppet
+if libkv::exists("hosts/${facts['fqdn']}", { 'app_id' => 'myapp' }) {
    notify { "hosts/${facts['fqdn']} exists": }
 }
 ```
@@ -277,6 +301,14 @@ if libkv::exists("hosts/${facts['fqdn']}") {
 }
 ```
 
+###### Check for the existence of a key in the backend servicing an application id
+
+```puppet
+if libkv::exists("hosts/${facts['fqdn']}", { 'app_id' => 'myapp' }) {
+   notify { "hosts/${facts['fqdn']} exists": }
+}
+```
+
 ##### `key`
 
 Data type: `String[1]`
@@ -296,12 +328,32 @@ The key to check. Must conform to the following:
 
 Data type: `Optional[Hash]`
 
-Hash that specifies global libkv options and/or the specific
-backend to use (with or without backend-specific configuration).
-Will be merged with `libkv::options`.
+libkv configuration that will be merged with
+`libkv::options`.  All keys are optional.
 
 Options:
 
+* **'app_id'** `String`: Specifies an application name that can be used to identify which backend
+configuration to use via fuzzy name matching, in the absence of the
+`backend` option.
+
+  * More flexible option than `backend`.
+  * Useful for grouping together libkv function calls found in different
+    catalog resources.
+  * When specified and the `backend` option is absent, the backend will be
+    selected preferring a backend in the merged `backends` option whose
+    name exactly matches the `app_id`, followed by the longest backend
+    name that matches the beginning of the `app_id`, followed by the
+    `default` backend.
+  * When absent and the `backend` option is also absent, this function
+    will use the `default` backend.
+* **'backend'** `String`: Definitive name of the backend to use.
+
+  * Takes precedence over `app_id`.
+  * When present, must match a key in the `backends` option of the
+    merged options Hash or the function will fail.
+  * When absent in the merged options, this function will select
+    the backend as described in the `app_id` option.
 * **'backends'** `Hash`: Hash of backend configurations
 
   * Each backend configuration in the merged options Hash must be
@@ -313,15 +365,6 @@ Options:
 
    * Other keys for configuration specific to the backend may also be
      present.
-* **'backend'** `String`: Name of the backend to use.
-
-  * When present, must match a key in the `backends` option of the
-    merged options Hash.
-  * When absent and not specified in `libkv::options`, this function
-    will look for a 'default.xxx' backend whose name matches the
-    `resource` option.  This is typically the catalog resource id of the
-    calling Class, specific defined type instance, or defined type.
-    If no match is found, it will use the 'default' backend.
 * **'environment'** `String`: Puppet environment to prepend to keys.
 
   * When set to a non-empty string, it is prepended to the key used in
@@ -329,21 +372,6 @@ Options:
   * Should only be set to an empty string when the key being accessed is
     truly global.
   * Defaults to the Puppet environment for the node.
-* **'resource'** `String`: Name of the Puppet resource initiating this libkv operation
-
-  * Required when `backend` is not specified and you want to be able
-    to use more than the `default` backend.
-  * String should be resource as it would appear in the catalog or
-    some application grouping id
-
-    * 'Class[<class>]' for a class, e.g.  'Class[Mymodule::Myclass]'
-    * '<Defined type>[<instance>]' for a defined type instance, e.g.,
-      'Mymodule::Mydefine[myinstance]'
-
-  * Catalog resource id cannot be reliably determined automatically.
-    Appropriate scope is not necessarily available when a libkv function
-    is called within any other function.  This is problematic for heavily
-    used Puppet built-in functions such as `each`.
 * **'softfail'** `Boolean`: Whether to ignore libkv operation failures.
 
   * When `true`, this function will return a result even when the
@@ -365,6 +393,15 @@ Retrieves the value and any metadata stored at `key` from the
 
 ```puppet
 $result = libkv::get("database/${facts['fqdn']}")
+class { 'wordpress':
+  db_host => $result['value']
+}
+```
+
+##### Retrieve the value and any metadata for a key in the backend servicing an application id
+
+```puppet
+$result = libkv::get("database/${facts['fqdn']}", { 'app_id' => 'myapp' })
 class { 'wordpress':
   db_host => $result['value']
 }
@@ -399,6 +436,15 @@ class { 'wordpress':
 }
 ```
 
+###### Retrieve the value and any metadata for a key in the backend servicing an application id
+
+```puppet
+$result = libkv::get("database/${facts['fqdn']}", { 'app_id' => 'myapp' })
+class { 'wordpress':
+  db_host => $result['value']
+}
+```
+
 ##### `key`
 
 Data type: `String[1]`
@@ -418,12 +464,32 @@ The key to retrieve. Must conform to the following:
 
 Data type: `Optional[Hash]`
 
-Hash that specifies global libkv options and/or the specific
-backend to use (with or without backend-specific configuration).
-Will be merged with `libkv::options`.
+libkv configuration that will be merged with
+`libkv::options`.  All keys are optional.
 
 Options:
 
+* **'app_id'** `String`: Specifies an application name that can be used to identify which backend
+configuration to use via fuzzy name matching, in the absence of the
+`backend` option.
+
+  * More flexible option than `backend`.
+  * Useful for grouping together libkv function calls found in different
+    catalog resources.
+  * When specified and the `backend` option is absent, the backend will be
+    selected preferring a backend in the merged `backends` option whose
+    name exactly matches the `app_id`, followed by the longest backend
+    name that matches the beginning of the `app_id`, followed by the
+    `default` backend.
+  * When absent and the `backend` option is also absent, this function
+    will use the `default` backend.
+* **'backend'** `String`: Definitive name of the backend to use.
+
+  * Takes precedence over `app_id`.
+  * When present, must match a key in the `backends` option of the
+    merged options Hash or the function will fail.
+  * When absent in the merged options, this function will select
+    the backend as described in the `app_id` option.
 * **'backends'** `Hash`: Hash of backend configurations
 
   * Each backend configuration in the merged options Hash must be
@@ -435,15 +501,6 @@ Options:
 
    * Other keys for configuration specific to the backend may also be
      present.
-* **'backend'** `String`: Name of the backend to use.
-
-  * When present, must match a key in the `backends` option of the
-    merged options Hash.
-  * When absent and not specified in `libkv::options`, this function
-    will look for a 'default.xxx' backend whose name matches the
-    `resource` option.  This is typically the catalog resource id of the
-    calling Class, specific defined type instance, or defined type.
-    If no match is found, it will use the 'default' backend.
 * **'environment'** `String`: Puppet environment to prepend to keys.
 
   * When set to a non-empty string, it is prepended to the key used in
@@ -451,21 +508,6 @@ Options:
   * Should only be set to an empty string when the key being accessed is
     truly global.
   * Defaults to the Puppet environment for the node.
-* **'resource'** `String`: Name of the Puppet resource initiating this libkv operation
-
-  * Required when `backend` is not specified and you want to be able
-    to use more than the `default` backend.
-  * String should be resource as it would appear in the catalog or
-    some application grouping id
-
-    * 'Class[<class>]' for a class, e.g.  'Class[Mymodule::Myclass]'
-    * '<Defined type>[<instance>]' for a defined type instance, e.g.,
-      'Mymodule::Mydefine[myinstance]'
-
-  * Catalog resource id cannot be reliably determined automatically.
-    Appropriate scope is not necessarily available when a libkv function
-    is called within any other function.  This is problematic for heavily
-    used Puppet built-in functions such as `each`.
 * **'softfail'** `Boolean`: Whether to ignore libkv operation failures.
 
   * When `true`, this function will return a result even when the
@@ -486,6 +528,17 @@ Returns a list of all keys in a folder.
 
 ```puppet
 $hosts = libkv::list('hosts')
+$hosts.each |$host, $info | {
+  host { $host:
+    ip => $info['value'],
+  }
+}
+```
+
+##### Retrieve the list of key info for a key folder in the backend servicing an application id
+
+```puppet
+$hosts = libkv::list('hosts', { 'app_id' => 'myapp' })
 $hosts.each |$host, $info | {
   host { $host:
     ip => $info['value'],
@@ -523,6 +576,17 @@ $hosts.each |$host, $info | {
 }
 ```
 
+###### Retrieve the list of key info for a key folder in the backend servicing an application id
+
+```puppet
+$hosts = libkv::list('hosts', { 'app_id' => 'myapp' })
+$hosts.each |$host, $info | {
+  host { $host:
+    ip => $info['value'],
+  }
+}
+```
+
 ##### `keydir`
 
 Data type: `String[1]`
@@ -542,30 +606,43 @@ The key folder to list. Must conform to the following:
 
 Data type: `Optional[Hash]`
 
-Hash that specifies global libkv options and/or the specific
-backend to use (with or without backend-specific configuration).
-Will be merged with `libkv::options`.
+libkv configuration that will be merged with
+`libkv::options`.  All keys are optional.
 
 Options:
 
-* **'backends'** `Hash`: * Each backend configuration in the merged options Hash must be
-  a Hash that has the following keys:
+* **'app_id'** `String`: Specifies an application name that can be used to identify which backend
+configuration to use via fuzzy name matching, in the absence of the
+`backend` option.
 
-  * `type`:  Backend type.
-  * `id`:  Unique name for the instance of the backend. (Same backend
-    type can be configured differently).
+  * More flexible option than `backend`.
+  * Useful for grouping together libkv function calls found in different
+    catalog resources.
+  * When specified and the `backend` option is absent, the backend will be
+    selected preferring a backend in the merged `backends` option whose
+    name exactly matches the `app_id`, followed by the longest backend
+    name that matches the beginning of the `app_id`, followed by the
+    `default` backend.
+  * When absent and the `backend` option is also absent, this function
+    will use the `default` backend.
+* **'backend'** `String`: Definitive name of the backend to use.
 
- * Other keys for configuration specific to the backend may also be
-   present.
-* **'backend'** `String`: Name of the backend to use.
-
+  * Takes precedence over `app_id`.
   * When present, must match a key in the `backends` option of the
-    merged options Hash.
-  * When absent and not specified in `libkv::options`, this function
-    will look for a 'default.xxx' backend whose name matches the
-    `resource` option.  This is typically the catalog resource id of the
-    calling Class, specific defined type instance, or defined type.
-    If no match is found, it will use the 'default' backend.
+    merged options Hash or the function will fail.
+  * When absent in the merged options, this function will select
+    the backend as described in the `app_id` option.
+* **'backends'** `Hash`: Hash of backend configurations
+
+  * Each backend configuration in the merged options Hash must be
+    a Hash that has the following keys:
+
+    * `type`:  Backend type.
+    * `id`:  Unique name for the instance of the backend. (Same backend
+      type can be configured differently).
+
+   * Other keys for configuration specific to the backend may also be
+     present.
 * **'environment'** `String`: Puppet environment to prepend to keys.
 
   * When set to a non-empty string, it is prepended to the key used in
@@ -573,21 +650,6 @@ Options:
   * Should only be set to an empty string when the key being accessed is
     truly global.
   * Defaults to the Puppet environment for the node.
-* **'resource'** `String`: Name of the Puppet resource initiating this libkv operation
-
-  * Required when `backend` is not specified and you want to be able
-    to use more than the `default` backend.
-  * String should be resource as it would appear in the catalog or
-    some application grouping id
-
-    * 'Class[<class>]' for a class, e.g.  'Class[Mymodule::Myclass]'
-    * '<Defined type>[<instance>]' for a defined type instance, e.g.,
-      'Mymodule::Mydefine[myinstance]'
-
-  * Catalog resource id cannot be reliably determined automatically.
-    Appropriate scope is not necessarily available when a libkv function
-    is called within any other function.  This is problematic for heavily
-    used Puppet built-in functions such as `each`.
 * **'softfail'** `Boolean`: Whether to ignore libkv operation failures.
 
   * When `true`, this function will return a result even when the
@@ -603,6 +665,29 @@ Type: Ruby 4.x API
 Sets the data at `key` to the specified `value` in the configured backend.
 Optionally sets metadata along with the `value`.
 
+#### Examples
+
+##### Set a key using the default backend
+
+```puppet
+libkv::put("hosts/${facts['clientcert']}", $facts['ipaddress'])
+```
+
+##### Set a key with metadata using the default backend
+
+```puppet
+$meta = { 'rack_id' => 183 }
+libkv::put("hosts/${facts['clientcert']}", $facts['ipaddress'], $meta)
+```
+
+##### Set a key with metadata using the backend servicing an application id
+
+```puppet
+$meta = { 'rack_id' => 183 }
+$opts = { 'app_id' => 'myapp' }
+libkv::put("hosts/${facts['clientcert']}", $facts['ipaddress'], $meta, $opts)
+```
+
 #### `libkv::put(String[1] $key, NotUndef $value, Optional[Hash] $metadata, Optional[Hash] $options)`
 
 Sets the data at `key` to the specified `value` in the configured backend.
@@ -616,6 +701,29 @@ Raises:
 * `ArgumentError` If the key or merged backend config is invalid
 * `LoadError` If the libkv adapter cannot be loaded
 * `RuntimeError` If the backend operation fails, unless 'softfail' is `true` in the merged backend options.
+
+##### Examples
+
+###### Set a key using the default backend
+
+```puppet
+libkv::put("hosts/${facts['clientcert']}", $facts['ipaddress'])
+```
+
+###### Set a key with metadata using the default backend
+
+```puppet
+$meta = { 'rack_id' => 183 }
+libkv::put("hosts/${facts['clientcert']}", $facts['ipaddress'], $meta)
+```
+
+###### Set a key with metadata using the backend servicing an application id
+
+```puppet
+$meta = { 'rack_id' => 183 }
+$opts = { 'app_id' => 'myapp' }
+libkv::put("hosts/${facts['clientcert']}", $facts['ipaddress'], $meta, $opts)
+```
 
 ##### `key`
 
@@ -648,12 +756,32 @@ Additional information to be persisted
 
 Data type: `Optional[Hash]`
 
-Hash that specifies global libkv options and/or the specific
-backend to use (with or without backend-specific configuration).
-Will be merged with `libkv::options`.
+libkv configuration that will be merged with
+`libkv::options`.  All keys are optional.
 
 Options:
 
+* **'app_id'** `String`: Specifies an application name that can be used to identify which backend
+configuration to use via fuzzy name matching, in the absence of the
+`backend` option.
+
+  * More flexible option than `backend`.
+  * Useful for grouping together libkv function calls found in different
+    catalog resources.
+  * When specified and the `backend` option is absent, the backend will be
+    selected preferring a backend in the merged `backends` option whose
+    name exactly matches the `app_id`, followed by the longest backend
+    name that matches the beginning of the `app_id`, followed by the
+    `default` backend.
+  * When absent and the `backend` option is also absent, this function
+    will use the `default` backend.
+* **'backend'** `String`: Definitive name of the backend to use.
+
+  * Takes precedence over `app_id`.
+  * When present, must match a key in the `backends` option of the
+    merged options Hash or the function will fail.
+  * When absent in the merged options, this function will select
+    the backend as described in the `app_id` option.
 * **'backends'** `Hash`: Hash of backend configurations
 
   * Each backend configuration in the merged options Hash must be
@@ -665,13 +793,6 @@ Options:
 
    * Other keys for configuration specific to the backend may also be
      present.
-* **'backend'** `String`: * When present, must match a key in the `backends` option of the
-  merged options Hash.
-* When absent and not specified in `libkv::options`, this function
-  will look for a 'default.xxx' backend whose name matches the
-  `resource` option.  This is typically the catalog resource id of the
-  calling Class, specific defined type instance, or defined type.
-  If no match is found, it will use the 'default' backend.
 * **'environment'** `String`: Puppet environment to prepend to keys.
 
   * When set to a non-empty string, it is prepended to the key used in
@@ -679,21 +800,6 @@ Options:
   * Should only be set to an empty string when the key being accessed is
     truly global.
   * Defaults to the Puppet environment for the node.
-* **'resource'** `String`: Name of the Puppet resource initiating this libkv operation
-
-  * Required when `backend` is not specified and you want to be able
-    to use more than the `default` backend.
-  * String should be resource as it would appear in the catalog or
-    some application grouping id
-
-    * 'Class[<class>]' for a class, e.g.  'Class[Mymodule::Myclass]'
-    * '<Defined type>[<instance>]' for a defined type instance, e.g.,
-      'Mymodule::Mydefine[myinstance]'
-
-  * Catalog resource id cannot be reliably determined automatically.
-    Appropriate scope is not necessarily available when a libkv function
-    is called within any other function.  This is problematic for heavily
-    used Puppet built-in functions such as `each`.
 * **'softfail'** `Boolean`: Whether to ignore libkv operation failures.
 
   * When `true`, this function will return a result even when the
@@ -708,22 +814,56 @@ Type: Ruby 4.x API
 
 Create merged backend configuration and then validate it.
 
-The `options` argument is merged with `libkv::options` Hiera and global libkv
-defaults and then, if the `backends` option is missing in the merged
-configuration, it is inserted with a a single `default` backend of type `file`.
+The merge entails the following operations:
+* The `options` argument is merged with `libkv::options` Hiera and global
+  libkv defaults.
+
+* If the `backend` options is missing in the merged options, it is set to
+  a value determined as follows:
+
+  * If the `app_id` option is present and the name of a backend in `backends`
+    matches `app_id`, `backend` will be set to `app_id`.
+  * Otherwise, if the `app_id` option is present and the name of a backend in
+    `backends` matches the beginning of `app_id`, `backend` will be set to
+    that partially-matching backend name. When multiple backends satisfy
+    the 'start with' match, the backend with the most matching characters is
+    selected.
+  * Otherwise, if the `app_id` option does not match any backend name or is
+    not present, `backend` will be set to `default`.
+
+* If the `backends` option is missing in the merged options, it is set to
+  a Hash containing a single entry, `default`, that has configuration for
+  the libkv 'file' backend.
 
 Validation includes the following checks:
 * configuration for the selected backend exists
 * the plugin for the selected backend has been loaded
 * different configuration for a specific plugin instance does not exist
 
-#### `libkv::support::config::merge(Hash $options, Array $backends, String[1] $resource_info)`
+#### `libkv::support::config::merge(Hash $options, Array $backends)`
 
 Create merged backend configuration and then validate it.
 
-The `options` argument is merged with `libkv::options` Hiera and global libkv
-defaults and then, if the `backends` option is missing in the merged
-configuration, it is inserted with a a single `default` backend of type `file`.
+The merge entails the following operations:
+* The `options` argument is merged with `libkv::options` Hiera and global
+  libkv defaults.
+
+* If the `backend` options is missing in the merged options, it is set to
+  a value determined as follows:
+
+  * If the `app_id` option is present and the name of a backend in `backends`
+    matches `app_id`, `backend` will be set to `app_id`.
+  * Otherwise, if the `app_id` option is present and the name of a backend in
+    `backends` matches the beginning of `app_id`, `backend` will be set to
+    that partially-matching backend name. When multiple backends satisfy
+    the 'start with' match, the backend with the most matching characters is
+    selected.
+  * Otherwise, if the `app_id` option does not match any backend name or is
+    not present, `backend` will be set to `default`.
+
+* If the `backends` option is missing in the merged options, it is set to
+  a Hash containing a single entry, `default`, that has configuration for
+  the libkv 'file' backend.
 
 Validation includes the following checks:
 * configuration for the selected backend exists
@@ -749,17 +889,6 @@ Data type: `Array`
 
 List of backends for which plugins have been successfully
 loaded.
-
-##### `resource_info`
-
-Data type: `String[1]`
-
-Resource string for the Puppet class or define that has
-called the libkv function.
-
-* Examples: 'Class[Mymodule::Myclass]' or 'Mymodule::Mydefine[myinstance]'
-* Used to determine the default backend to use, when none is specified
-  in the libkv options Hash
 
 ### libkv::support::config::validate
 

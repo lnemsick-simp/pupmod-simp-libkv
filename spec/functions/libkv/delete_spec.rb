@@ -7,15 +7,15 @@ describe 'libkv::delete' do
   before(:each) do
     # set up configuration for the file plugin
     @tmpdir = Dir.mktmpdir
-    @root_path_test_file     = File.join(@tmpdir, 'libkv', 'test_file')
-    @root_path_default_class = File.join(@tmpdir, 'libkv', 'default_class')
-    @root_path_default       = File.join(@tmpdir, 'libkv', 'default')
+    @root_path_test_file      = File.join(@tmpdir, 'libkv', 'test_file')
+    @root_path_default_app_id = File.join(@tmpdir, 'libkv', 'default_app_id')
+    @root_path_default        = File.join(@tmpdir, 'libkv', 'default')
     options_base = {
       'environment' => 'production',
       'backends'    => {
         # will use failer plugin for catastrophic error cases, because
         # it is badly behaved and raises exceptions on all operations
-       'test_failer'  => {
+       'test_failer' => {
           'id'               => 'test',
           'type'             => 'failer',
           'fail_constructor' => false  # true = raise in constructor
@@ -26,22 +26,22 @@ describe 'libkv::delete' do
           'type'      => 'file',
           'root_path' => @root_path_test_file
         },
-        'default.Class[Mymodule::Myclass]'  => {
-          'id'        => 'default_class',
+        'myapp'      => {
+          'id'        => 'default_app_id',
           'type'      => 'file',
-          'root_path' => @root_path_default_class
+          'root_path' => @root_path_default_app_id
         },
-        'default'  => {
+        'default'    => {
           'id'        => 'default',
           'type'      => 'file',
           'root_path' => @root_path_default
         }
       }
     }
-    @options_failer        = options_base.merge ({ 'backend' => 'test_failer' } )
-    @options_test_file     = options_base.merge ({ 'backend' => 'test_file' } )
-    @options_default_class = options_base.merge ({ 'resource' => 'Class[Mymodule::Myclass]' } )
-    @options_default       = options_base
+    @options_failer         = options_base.merge ({ 'backend' => 'test_failer' } )
+    @options_test_file      = options_base.merge ({ 'backend' => 'test_file' } )
+    @options_default_app_id = options_base.merge ({ 'app_id'  => 'myapp10' } )
+    @options_default        = options_base
   end
 
   after(:each) do
@@ -53,7 +53,7 @@ describe 'libkv::delete' do
 
   context 'without libkv::options' do
     let(:test_file_keydir) { File.join(@root_path_test_file, 'production') }
-    let(:default_class_keydir) { File.join(@root_path_default_class, 'production') }
+    let(:default_app_id_keydir) { File.join(@root_path_default_app_id, 'production') }
     let(:default_keydir) { File.join(@root_path_default, 'production') }
     let(:key) { 'mykey' }
 
@@ -66,7 +66,7 @@ describe 'libkv::delete' do
       expect( File.exist?(key_file) ).to be false
     end
 
-    it 'should delete an existing key in the default backend in options when resource unspecified' do
+    it 'should delete an existing key in the default backend in options when app_id unspecified' do
       FileUtils.mkdir_p(default_keydir)
       key_file = File.join(default_keydir, key)
       FileUtils.touch(key_file)
@@ -75,12 +75,12 @@ describe 'libkv::delete' do
       expect( File.exist?(key_file) ).to be false
     end
 
-    it 'should delete an existing key in the default backend for the resource' do
-      FileUtils.mkdir_p(default_class_keydir)
-      key_file = File.join(default_class_keydir, key)
+    it 'should delete an existing key in the default backend for the app_id' do
+      FileUtils.mkdir_p(default_app_id_keydir)
+      key_file = File.join(default_app_id_keydir, key)
       FileUtils.touch(key_file)
 
-      is_expected.to run.with_params(key, @options_default_class).and_return(true)
+      is_expected.to run.with_params(key, @options_default_app_id).and_return(true)
       expect( File.exist?(key_file) ).to be false
     end
 
