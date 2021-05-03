@@ -1,4 +1,6 @@
 require 'beaker-rspec'
+require_relative 'acceptance/shared_examples'
+
 require 'tmpdir'
 require 'yaml'
 require 'simp/beaker_helpers'

@@ -1,13 +1,21 @@
 ---
 fixtures:
   repositories:
-    stdlib: https://github.com/simp/puppetlabs-stdlib.git
-    simplib: https://github.com/simp/pupmod-simp-simplib.git
+    ds389:  "https://github.com/simp/pupmod-simp-ds389.git"
+    pki: "https://github.com/simp/pupmod-simp-pki.git"
+    selinux: "https://github.com/simp/pupmod-simp-selinux.git"
+    simplib:  "https://github.com/simp/pupmod-simp-simplib.git"
+    stdlib:   "https://github.com/simp/puppetlabs-stdlib.git"
+    vox_selinux:
+      repo: "https://github.com/simp/pupmod-voxpupuli-selinux.git"
+      branch: simp-master
+
     # This needs to be in place for the rspec-puppet Hiera 5 hook to work
     # No idea why, it may be because Puppet sees a custom backend and loads all
     # of the global parts.
     compliance_markup: https://github.com/simp/pupmod-simp-compliance_markup.git
   symlinks:
-    simpkv: "#{source_dir}"
-    test_plugins: "#{File.join(source_dir, 'spec', 'support', 'modules', 'test_plugins')}"
-    simpkv_test: "#{File.join(source_dir, 'spec', 'support', 'modules', 'simpkv_test')}"
+    simpkv:        "#{source_dir}"
+    test_plugins1: "#{File.join(source_dir, 'spec', 'support', 'modules', 'test_plugins1')}"
+    test_plugins2: "#{File.join(source_dir, 'spec', 'support', 'modules', 'test_plugins2')}"
+    simpkv_test:   "#{File.join(source_dir, 'spec', 'support', 'modules', 'simpkv_test')}"

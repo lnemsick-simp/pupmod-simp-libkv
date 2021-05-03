@@ -168,25 +168,27 @@ simpkv must provide a backend plugin adapter that
 
 simpkv must supply a backend plugin API that provides
 
-  * Public API method signatures, including the constructor and a
-    method that reports the plugin type (typically backend it supports)
-  * Description of any universal plugin options that must be supported
-  * Ability to specify plugin-specific options
+  * Public API method signatures, including the constructor and `configure()`
+    method
+  * Description of any universal plugin configuration options that must be
+    supported
+  * Ability to specify plugin-specific configuration options
   * Explicit policy on error handling (how to report errors, what information
     the messages should contain for plugin proper identification, whether
     exceptions are allowed)
-  * Details on the code structure required for prevention of cross-environment
-    contamination
+  * Details on the code structure required for prevention of cross-Puppet-
+    environment contamination
   * Documentation requirements
   * Testing requirements
 
 Each plugin must conform to the plugin API and satisfy the following
 general requirements:
 
-* All plugins must be unique.
+* All plugin files, potentially from multiple modules, must be uniquely named.
 
-  * Plugin Ruby files can be named the same in different modules, but
-    their reported plugin types must be unique.
+  * The plugin type is derived from its filename: <plugin name>\_plugin.rb.
+  * Only one plugin of the same name will be loaded and a warning will be
+    emitted for all other conflicting plugin files.
 
 * All plugins must allow multiple instances of the plugin to be instantiated
   and used in a single catalog compile.
@@ -298,7 +300,7 @@ general requirements:
 This is a placeholder for miscellaneous, additional simpkv requirements
 to be addressed, once it moves beyond the prototype stage.
 
-* simpkv must provide a plugin for a remote key/value store, such as Consul
+* simpkv must provide a plugin for a remote key/value store, such as LDAP
 * simpkv must support audit operations on a key/value store
 
   * Auditing information to be provided must include:
@@ -318,7 +320,7 @@ to be addressed, once it moves beyond the prototype stage.
 * simpkv should provide a script to import existing
   `simplib::passgen()` passwords stored in the puppetserver cache
   directory, PKI secrets stored in `/var/simp/environments`, and Kerberos secrets
-  stored in `/var/simp/environments` to a backend.
+  stored in `/var/simp/environments` into a backend.
 * simpkv local file backend must encrypt each file it maintains.
 * simpkv local file backend must ensure multi-process-safe `put`,
   `delete`, and `deletetree` operations on a <insert shared file system
@@ -488,6 +490,9 @@ configuration.
 
 * `type` must be unique across all backend plugins, including those
   provided by other modules.
+
+  * The `type` of each is derived from the filename of its plugin software.
+
 * `id` must be unique for a each distinct configuration for a `type`.
 * Other keys for configuration specific to the backend may also be present.
 

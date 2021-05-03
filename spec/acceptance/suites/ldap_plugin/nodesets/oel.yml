@@ -6,23 +6,31 @@
   end
 -%>
 HOSTS:
-  el8:
+  oel8:
     roles:
       - default
+      - ldap_server
+      - client
     platform: el-8-x86_64
-    box: generic/centos8
+    box: generic/oracle8
     hypervisor: <%= hypervisor %>
 
-  el7:
+  oel7:
+    roles:
+      - client
     platform: el-7-x86_64
-    box: centos/7
+    box: generic/oracle7
     hypervisor: <%= hypervisor %>
 
 CONFIG:
   log_level: verbose
-  synced_folder : disabled
   type: aio
-  vagrant_memsize: 256
+<% if ENV['BEAKER_fips'] -%>
+  vagrant_memsize: 1024
+<% else -%>
+  vagrant_memsize: 512
+<% end -%>
+  vagrant_cpus: 2
 <% if ENV['BEAKER_PUPPET_COLLECTION'] -%>
   puppet_collection: <%= ENV['BEAKER_PUPPET_COLLECTION'] %>
 <% end -%>

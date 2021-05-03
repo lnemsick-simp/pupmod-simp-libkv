@@ -1,5 +1,6 @@
 class simpkv_test::put inherits simpkv_test::params
 {
+  # Add environment keys without metadata for the specified app_id
   $_empty_test_meta = {}
   $simpkv_test::params::key_value_pairs.each |$key, $value| {
     # Add Puppet env keys without metadata for the specified app_id

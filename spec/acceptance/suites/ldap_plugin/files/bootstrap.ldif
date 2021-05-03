@@ -1,0 +1,30 @@
+# Create the top-level database
+dn: cn="dc=simp",cn=mapping tree,cn=config
+cn: dc=simp
+objectClass: top
+objectClass: extensibleObject
+objectClass: nsMappingTree
+nsslapd-state: backend
+nsslapd-backend: UserData
+
+dn: dc=simp
+dc: simp
+objectClass: top
+objectClass: domain
+
+dn: ou=Aliases,dc=simp
+ou: Aliases
+objectClass: top
+objectClass: organizationalUnit
+
+dn: o=puppet,dc=simp
+o: puppet
+objectClass: top
+objectClass: organization
+
+dn: ou=simpkv,o=puppet,dc=simp
+ou: simpkv
+objectClass: top
+objectClass: organizationalUnit
+description: Root directory of all simpkv LDAP trees
+

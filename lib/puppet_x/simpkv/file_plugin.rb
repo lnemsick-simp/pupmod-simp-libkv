@@ -3,24 +3,35 @@
 #
 # Each plugin **MUST** be an anonymous class accessible only through
 # a `plugin_class` local variable.
+# DO NOT CHANGE THE LINE BELOW!!!!
 plugin_class = Class.new do
 
   require 'etc'
   require 'fileutils'
   require 'timeout'
 
-  # Reminder:  Do **NOT** try to set constants in this Class.new block.
-  #            They don't do what you expect (are not accessible within
-  #            any class methods) and pollute the Object namespace.
+  # NOTES FOR MAINTAINERS:
+  # - See simpkv/lib/puppet_x/simpkv/plugin_template.rb for important
+  #   information about plugin responsibilties and restrictions.
+  # - One OBTW that will drive you crazy are limitations on anonymous classes.
+  #   In typical Ruby code, using constants and class methods is quite normal.
+  #   Unfortunately, you cannot use constants or class methods in an anonymous
+  #   class, as they will be added to the Class Object, itself, and will not be
+  #   available to the anonymous class. In other words, you will be tearing your
+  #   hair out trying to figure out why normal Ruby code does not work here!
 
   ###### Public Plugin API ######
 
-  # @return String. backend type
-  def self.type
-    'file'
+  # Construct an instance of this plugin setting its instance name
+  #
+  # @param name Name to ascribe to this plugin instance
+  #
+  def initialize(name)
+    @name = name
+    Puppet.debug("#{@name} simpkv plugin configured")
   end
 
-  # Constructs an instance of this plugin using global and plugin-specific
+  # Configure this plugin instance using global and plugin-specific
   # configuration found in options
   #
   # The plugin-specific configuration will be found in
@@ -33,12 +44,11 @@ plugin_class = Class.new do
   #   on a file modifying operation before failing the operation; defaults
   #   to 5 seconds
   #
-  # @param name Name to ascribe to this plugin instance
   # @param options Hash of global simpkv and backend-specific options
   # @raise RuntimeError if any required configuration is missing from options,
   #   the root directory can be created when missing, or the root directory
   #   exists but cannnot be read/modified by this process
-  def initialize(name, options)
+  def configure(options)
     # backend config should already have been verified by simpkv adapter, but
     # just in case...
     unless (
@@ -56,7 +66,6 @@ plugin_class = Class.new do
       raise("Plugin misconfigured: #{options}")
     end
 
-    @name = name
 
     # set optional configuration
     backend = options['backend']
@@ -72,8 +81,9 @@ plugin_class = Class.new do
     ensure_folder_path('globals')
     ensure_folder_path('environments')
 
-    Puppet.debug("#{@name} simpkv plugin for #{@root_path} constructed")
+    Puppet.debug("#{@name} simpkv plugin for #{@root_path} configured")
   end
+
 
 
   # Deletes a `key` from the configured backend.
