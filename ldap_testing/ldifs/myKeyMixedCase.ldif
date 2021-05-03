@@ -1,0 +1,8 @@
+dn: simpkvKey=myKeyMixedCase,ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp
+objectClass: simpkvEntry
+objectClass: top
+simpkvKey: myKeyMixedCase
+simpkvJsonValue: {"value":"some value for myKeyMixedCase","metadata":{}}
+
+
+
