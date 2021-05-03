@@ -1,0 +1,61 @@
+# Create the top-level database
+dn: cn="dc=simp",cn=mapping tree,cn=config
+cn: dc=simp
+objectClass: top
+objectClass: extensibleObject
+objectClass: nsMappingTree
+nsslapd-state: backend
+nsslapd-backend: UserData
+
+dn: dc=simp
+dc: simp
+objectClass: top
+objectClass: domain
+
+dn: ou=Aliases,dc=simp
+ou: Aliases
+objectClass: top
+objectClass: organizationalUnit
+
+#dn: o=puppet,dc=simp
+#o: puppet
+#objectClass: top
+#objectClass: organization
+#
+#dn: ou=simpkv,o=puppet,dc=simp
+#ou: simpkv
+#objectClass: top
+#objectClass: organizationalUnit
+#description: Root directory of all simpkv LDAP trees
+
+## everything below here would be made by the LDAP plugin instance
+#dn: ou=default,ou=simpkv,o=puppet,dc=simp
+#ou: default
+#objectClass: top
+#objectClass: organizationalUnit
+#description: simpkv directory for keystore named default
+#
+#dn: ou=globals,ou=default,ou=simpkv,o=puppet,dc=simp
+#ou: global
+#objectClass: top
+#objectClass: organizationalUnit
+#description: Directory of global keys for default keystore
+#
+#dn: ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp
+#ou: environments
+#objectClass: top
+#objectClass: organizationalUnit
+#description: Root of the environment-specific key directory in the default keystore
+#
+#dn: ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp
+#ou: production
+#objectClass: top
+#objectClass: organizationalUnit
+#description: Root of key directory for the production puppet environment in the default keystore
+#
+##dn: cn=users,ou=Group,dc=simp
+##objectClass: groupOfUniqueNames
+###objectClass: posixGroup
+##objectClass: top
+##cn: users
+##gidNumber: 100

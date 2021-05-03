@@ -1,0 +1,12 @@
+# require 'base64'
+# Base64.strict_encode64('simpkvKey=myKey1,ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp')
+#
+# Base64.strict_encode64('myKey1')
+dn:: c2ltcGt2S2V5PW15S2V5MSxvdT1wcm9kdWN0aW9uLG91PWVudmlyb25tZW50cyxvdT1kZWZhdWx0LG91PXNpbXBrdixvPXB1cHBldCxkYz1zaW1w
+objectClass: simpkvEntry
+objectClass: top
+simpkvKey:: bXlLZXkx
+simpkvJsonValue: {"value":"some value for myKey1","metadata":{}}
+
+
+

@@ -1,0 +1,8 @@
+dn: simpkvKey=key1,ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp
+objectClass: simpkvEntry
+objectClass: top
+simpkvKey: key1
+simpkvJsonValue: {"value":"key1 value","metadata":{}}
+
+
+
