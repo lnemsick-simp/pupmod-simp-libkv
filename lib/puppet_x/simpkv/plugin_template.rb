@@ -1,5 +1,29 @@
 # Copy this file to <plugin name>_plugin.rb and address the FIXMEs
 #
+# REMINDERS:
+# - The plugin code must implement the API in this template.
+#
+# - The plugin code must protect from cross-puppet-environment contamination.
+#   Different versions of the module containing this plugin may be loaded
+#   into the puppetserver at the same time. So, unlike normal Ruby library
+#   code for which only one version will be loaded at a time (e.g., gems
+#   installed in the puppetserver), you have to explicitly design this plugin
+#   code to prevent cross-environment-contamination.  This is why the plugin
+#   architecture requires this class to be anonymous and loads it appropriately.
+#   You must provide similar protections for any supporting Ruby code that you
+#   package in the module (e.g., a separate connector class).
+#
+# - The plugin code must allow multiple instances to be instantiated and run
+#   concurrently.
+#
+# - The plugin code is responsible for executing any appropriate retry logic
+#   on failed backend operations.
+#
+# - The plugin code must protect itself from hung operations.
+#
+# - When accessing the backend in the put(), get(), ... methods, the plugin code
+#   should catch exceptions, convert them to meaningful error messages and then
+#   return the failed status in its public API.
 
 # DO NOT CHANGE THIS LINE!!!!
 # Each plugin **MUST** be an anonymous class accessible only through
@@ -119,8 +143,11 @@ plugin_class = Class.new do
   #         >> to create useful error messages!   <<
   #
   # - If your plugin connects to an external service, you are strongly
-  #   encouraged to build retry logic and timeouts into your backend
+  #   encouraged to build timeouts and retry logic into your backend
   #   operations.
+  #
+  #   * The simpkv adapter does not currently protect against hung operations.
+  #   * Only you have domain knowledge to know when a retry is appropriate.
 
   # Deletes a `key` from the configured backend.
   #
@@ -132,7 +159,7 @@ plugin_class = Class.new do
   #
   def delete(key)
 
-    # FIXME: insert code that connects to the backend an affects the delete
+    # FIXME: insert code that connects to the backend and affects the delete
     # operation
     #
     # - This delete should be done atomically
@@ -153,7 +180,7 @@ plugin_class = Class.new do
   #
   def deletetree(keydir)
 
-    # FIXME: insert code that connects to the backend an affects the deletetree
+    # FIXME: insert code that connects to the backend and affects the deletetree
     # operation
     #
     # - If supported, this deletetree should be done atomically.  If not,
@@ -177,7 +204,7 @@ plugin_class = Class.new do
   #
   def exists(key)
 
-    # FIXME: insert code that connects to the backend an affects the exists
+    # FIXME: insert code that connects to the backend and affects the exists
     # operation
     #
     # - Convert any exceptions into a failed status result with a meaningful
@@ -198,7 +225,7 @@ plugin_class = Class.new do
   #
   def get(key)
 
-    # FIXME: insert code that connects to the backend an affects the get
+    # FIXME: insert code that connects to the backend and affects the get
     # operation
     #
     # - If possible, this get should be done atomically
@@ -231,7 +258,7 @@ plugin_class = Class.new do
   #
   def list(keydir)
 
-    # FIXME: insert code that connects to the backend an affects the list
+    # FIXME: insert code that connects to the backend and affects the list
     # operation
     #
     # - Convert any exceptions into a failed status result with a meaningful
@@ -252,7 +279,7 @@ plugin_class = Class.new do
   #
   def put(key, value)
 
-    # FIXME: insert code that connects to the backend an affects the put
+    # FIXME: insert code that connects to the backend and affects the put
     # operation
     #
     # - This delete should be done atomically
