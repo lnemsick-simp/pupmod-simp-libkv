@@ -327,8 +327,8 @@ plugin_class = Class.new do
   def put(key, value)
     full_key_path =  File.join(@instance_path, key)
 
-    # We want to add the key/value entry if it does not exist but only modify
-    # the value if it does, so that we do not update modifyTimestamp
+    # We want to add the key/value entry if it does not exist, but only modify
+    # the value if it does. This is so that we do not update modifyTimestamp
     # unnecessarily. The tricky part is that at any point in this process,
     # something else could be modifying the database at the same time. So
     # there is no point in checking for the existence of the key's folders or
@@ -340,13 +340,13 @@ plugin_class = Class.new do
     ldap_results = ensure_folder_path( File.dirname(full_key_path) )
     if ldap_results[:success]
       # first try an add for the key/value entry
-      ldif = entry_add_ldif(key, value)
+      ldif = entry_add_ldif(full_key_path, value)
       ldap_results = ldap_add(ldif, false)
 
       if ldap_results[:success]
         results = { :result => true, :err_msg => nil }
       elsif (ldap_results[:exitstatus] == 68)  # Already exists
-        ldif = entry_modify_ldif(key, value)
+        ldif = entry_modify_ldif(full_key_path, value)
         ldap_results = ldap_modify(ldif, false)
         if ldap_results[:success]
           results = { :result => true, :err_msg => nil }
