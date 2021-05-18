@@ -30,9 +30,13 @@
 # a `plugin_class` local variable.
 plugin_class = Class.new do
 
-  # Reminder:  Do **NOT** try to set constants in this Class.new block.
-  #            They don't do what you expect (are not accessible within
-  #            any class methods) and pollute the Object namespace.
+  # WARNING:
+  # In typical Ruby code, using constants and class methods are quite typical.
+  # Unfortunately, you cannot use constants or class methods in an anonymous
+  # class, as they will be added to the Class Object, itself, and will
+  # not be available to the anonymous class. In other words, you will
+  # be tearing your hair out trying to figure out why normal code does
+  # not work!
 
   ###### Public Plugin API ######
 

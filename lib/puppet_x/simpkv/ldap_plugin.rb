@@ -13,8 +13,12 @@ plugin_class = Class.new do
 
   ###### Public Plugin API ######
 
+#FIXME This is poluting the Class namespace and may not work
+#for each intance
   # @return String. backend type
   def self.type
+require 'pry'
+binding.pry
     'ldap'
   end
 
@@ -89,9 +93,6 @@ plugin_class = Class.new do
     verify_ldap_setup
     ensure_instance_tree
 
-    # create instance tree structure if it does not exist?
-    #
-
     Puppet.debug("#{@name} simpkv plugin constructed")
   end
 
@@ -111,15 +112,42 @@ plugin_class = Class.new do
   def delete(key)
     full_key_path =  File.join(@instance_path, key)
 
-    # FIXME: insert code that connects to the backend an affects the delete
-    # operation
-    #
-    # - This delete should be done atomically
-    # - Convert any exceptions into a failed status result with a meaningful
-    #   error message.
-    #
+# ldapdelete -x -w "P@ssw0rdP@ssw0rd" -D "cn=Directory_Manager"   -H ldapi://%2fvar%2frun%2fslapd-simp_kv.socket   "simpkvKey=key1,ou=group1,ou=app2,ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp"
+#
+    cmd = [
+      @cmd_env,
+      @ldapdelete,
+      @base_opts,
+# FIXME if @base_dn is configured, could have characters to be escaped?
+      path_to_dn(full_key_path)
+    ]
 
-    { :result => false, :err_msg => 'FIXME: not implemented' }
+    deleted = false
+    err_msg = nil
+    done = false
+    retries = @retries
+    until done
+      result = self.run_command(cmd.join)
+      case result[:exitstatus]
+      when 0
+        deleted = true
+        done = true
+      when 32  # "No such object"
+        deleted = true
+        done = true
+      when 51  # 'Server is busy'
+        if (retries == 0)
+          err_msg = result[:stderr]
+          done = true
+        end
+      else
+        err_msg = result[:stderr]
+        done = true
+      end
+      retries -= 1
+    end
+
+    { :result => deleted, :err_msg => err_msg }
   end
 
   # Deletes a whole folder from the configured backend.
@@ -132,17 +160,42 @@ plugin_class = Class.new do
   #
   def deletetree(keydir)
     full_keydir_path =  File.join(@instance_path, keydir)
+#ldapdelete -x -w "P@ssw0rdP@ssw0rd" -D "cn=Directory_Manager" -H ldapi://%2fvar%2frun%2fslapd-simp_kv.socket -r "ou=app3,ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp"
+    cmd = [
+      @cmd_env,
+      @ldapdelete,
+      @base_opts,
+      '-r',
+# FIXME if @base_dn is configured, could have characters to be escaped?
+      path_to_dn(full_keydir_path)
+    ]
 
-    # FIXME: insert code that connects to the backend and affects the deletetree
-    # operation
-    #
-    # - If supported, this deletetree should be done atomically.  If not,
-    #   it can be best-effort.
-    # - Convert any exceptions into a failed status result with a meaningful
-    #   error message.
-    #
+    deleted = false
+    err_msg = nil
+    done = false
+    retries = @retries
+    until done
+      result = self.run_command(cmd.join)
+      case result[:exitstatus]
+      when 0
+        deleted = true
+        done = true
+      when 32  # "No such object"
+        deleted = true
+        done = true
+      when 51  # 'Server is busy'
+        if (retries == 0)
+          err_msg = result[:stderr]
+          done = true
+        end
+      else
+        err_msg = result[:stderr]
+        done = true
+      end
+      retries -= 1
+    end
 
-    { :result => false, :err_msg => 'FIXME: not implemented' }
+    { :result => deleted, :err_msg => err_msg }
   end
 
   # Returns whether key or key folder exists in the configured backend.
@@ -177,6 +230,7 @@ plugin_class = Class.new do
       @cmd_env,
       @ldapsearch,
       @base_opts,
+# FIXME if @base_dn is configured, could have characters to be escaped?
       '-b', dn,
       @search_opts,
       scope,
@@ -185,30 +239,33 @@ plugin_class = Class.new do
     ]
 
     found = false
-    error_msg = nil
+    err_msg = nil
     done = false
     retries = @retries
     until done
-      result = run_command(cmd.join)
-      switch(result[:exitstatus])
-      case 0:
+puts methods.sort
+require 'pry'
+binding.pry
+      result = self.run_command(cmd.join)
+      case result[:exitstatus]
+      when 0
         # Parent DN exists, but search may or may not have returned a result.
         # Have to parse console output to see if a dn was returned.
         found = true if result[:stdout].match(%r{^dn: .*#{dn}})
         done = true
-      case 32:  # 'No such object'
+      when 32   # 'No such object'
         # Some part of the parent DN does not exist
         done = true
-      case 51: # 'Server is busy'
+      when 51  # 'Server is busy'
         done = true if (retries == 0)
       else
-        error_msg = result[:stderr]
+        err_msg = result[:stderr]
         done = true
       end
       retries -= 1
     end
 
-    { :result => found, :err_msg => error_msg }
+    { :result => found, :err_msg => err_msg }
   end
 
   # Retrieves the value stored at `key` from the configured backend.
@@ -228,6 +285,7 @@ plugin_class = Class.new do
       @cmd_env,
       @ldapsearch,
       @base_opts,
+# FIXME if @base_dn is configured, could have characters to be escaped?
       '-b', path_to_dn(full_key_path),
       @search_opts
     ]
@@ -237,9 +295,9 @@ plugin_class = Class.new do
     done = false
     retries = @retries
     until done
-      result = run_command(cmd.join)
-      switch(result[:exitstatus])
-      case 0:
+      result = self.run_command(cmd.join)
+      case result[:exitstatus]
+      when 0
           match = result[:stdout].match(/^simpkvJsonValue: (.*?)$/)
           if match
             value = match[1]
@@ -248,7 +306,7 @@ plugin_class = Class.new do
             err_msg += "\n#{result[:stdout]}"
           end
           done = true
-      case 51: # 'Server is busy'
+      when 51  # 'Server is busy'
         if (retries == 0)
           err_msg = result[:stderr]
           done = true
@@ -286,33 +344,54 @@ plugin_class = Class.new do
   def list(keydir)
     full_keydir_path =  File.join(@instance_path, keydir)
 
+
 #ldapsearch -x -w "P@ssw0rdP@ssw0rd" -D "cn=Directory_Manager" -H ldapi://%2fvar%2frun%2fslapd-simp_kv.socket -b "ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp" -o ldif_wrap=no -LLL -s one
-#dn: simpkvKey=key1,ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp
-#objectClass: simpkvEntry
-#objectClass: top
-#simpkvKey: key1
-#simpkvJsonValue: {"value":"key1 value","metadata":{}}
-#
-#dn: ou=app1,ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp
-#ou: app1
-#objectClass: top
-#objectClass: organizationalUnit
-#
-#dn: ou=app2,ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp
-#ou: app2
-#objectClass: top
-#objectClass: organizationalUnit
 
+    cmd = [
+      @cmd_env,
+      @ldapsearch,
+      @base_opts,
+# FIXME if @base_dn is configured, could have characters to be escaped?
+      '-b', path_to_dn(full_keydir_path),
+      '-s', 'one',
+      @search_opts
+    ]
 
-    # use scope parameter in ldapsearch to ensure only going 1 level deep
-    # FIXME: insert  code that connects to the backend an affects the list
-    # operation
-    #
-    # - Convert any exceptions into a failed status result with a meaningful
-    #   error message.
-    #
+    ldif_out = nil
+    err_msg = nil
+    done = false
+    retries = @retries
+    until done
+      result = self.run_command(cmd.join)
+      case result[:exitstatus]
+      when 0
+        ldif_out = result[:stdout]
+        done = true
+      when 32  # "No such object"
+        ldif_out = ''
+        done = true
+      when 51  # 'Server is busy'
+        if (retries == 0)
+          err_msg = result[:stderr]
+          done = true
+        end
+      else
+        err_msg = result[:stderr]
+        done = true
+      end
+      retries -= 1
+    end
 
-    { :result => nil, :err_msg => 'FIXME: not implemented' }
+    list = nil
+    unless ldif_out.nil?
+      if ldif_out.empty
+        list = { :keys => {}, :folders => [] }
+      else
+        list = parse_list_ldif(ldif_out)
+      end
+    end
+
+    { :result => list, :err_msg => err_msg }
   end
 
   # Sets the data at `key` to a `value` in the configured backend.
@@ -346,12 +425,24 @@ plugin_class = Class.new do
       if ldap_results[:success]
         results = { :result => true, :err_msg => nil }
       elsif (ldap_results[:exitstatus] == 68)  # Already exists
-        ldif = entry_modify_ldif(full_key_path, value)
-        ldap_results = ldap_modify(ldif, false)
-        if ldap_results[:success]
-          results = { :result => true, :err_msg => nil }
+# FIXME move to update_value()
+        current_result = get(key)
+        if current_result[:result]
+          if current_result[:result] != value
+            ldif = entry_modify_ldif(full_key_path, value)
+            ldap_results = ldap_modify(ldif, false)
+            if ldap_results[:success]
+              results = { :result => true, :err_msg => nil }
+            else
+              results = { :result => false, :err_msg => ldap_results[:err_msg] }
+            end
+          else
+            # no change needed
+            results = { :result => true, :err_msg => nil }
+          end
         else
-          results = { :result => false, :err_msg => ldap_results[:err_msg] }
+          err_msg = "Failed to retrieve current value for comparison: #{current_result[:err_msg]}"
+          results = { :result => false, :err_msg => err_msg }
         end
       else
         results = { :result => false, :err_msg => ldap_results[:err_msg] }
@@ -364,6 +455,31 @@ plugin_class = Class.new do
   end
 
   ###### Internal Methods ######
+  # command should not contain pipes, as they can cause inconsistent
+  # results
+  def self.run_command(command)
+    Puppet.debug( "Executing: #{command}" )
+    out_pipe_r, out_pipe_w = IO.pipe
+    err_pipe_r, err_pipe_w = IO.pipe
+    pid = spawn(command, :out => out_pipe_w, :err => err_pipe_w)
+    out_pipe_w.close
+    err_pipe_w.close
+
+    Process.wait(pid)
+    exitstatus = $?.nil? ? nil : $?.exitstatus
+    stdout = out_pipe_r.read
+    out_pipe_r.close
+    stderr = err_pipe_r.read
+    err_pipe_r.close
+
+    {
+      :success    => (exitstatus == 0),
+      :exitstatus => exitstatus,
+      :stdout     => stdout,
+      :stderr     => stderr
+    }
+  end
+
 
   # Ensures the basic tree for this instance is created below the base DN
   #   base DN
@@ -402,7 +518,11 @@ plugin_class = Class.new do
         @existing_folders.add(folder)
       else
         folders_added = false
-        results = { :success => false, :exitcode => ldap_results[:exitcode], :err_msg => ldap_results[:err_msg] }
+        results = {
+          :success  => false,
+          :exitcode => ldap_results[:exitcode],
+          :err_msg  => ldap_results[:err_msg]
+        }
         break
       end
     end
@@ -430,32 +550,32 @@ plugin_class = Class.new do
     done = false
     retries = @retries
     until done
-      result = run_command(cmd.join)
-      switch(result[:exitstatus])
-      case 0:
+      result = self.run_command(cmd.join)
+      case result[:exitstatus]
+      when 0
         added = true
         done = true
-      case 68:  # Already exists
+      when 68   # Already exists
         if ignore_already_exists
           added = true
         else
-          error_msg = result[:stderr]
+          err_msg = result[:stderr]
         end
         done = true
-      case 51: # 'Server is busy'
+      when 51  # 'Server is busy'
         if (retries == 0)
-          error_msg = result[:stderr]
+          err_msg = result[:stderr]
           done = true
         end
       else
-        error_msg = result[:stderr]
+        err_msg = result[:stderr]
         done = true
       end
       exitstatus = result[:exitstatus]
       retries -= 1
     end
 
-    { :success => added, :exitstatus => exitstatus, :err_msg => error_msg }
+    { :success => added, :exitstatus => exitstatus, :err_msg => err_msg }
   ensure
     ldif_file.close if ldif_file
     ldif_file.unlink if ldif_file
@@ -475,35 +595,35 @@ plugin_class = Class.new do
 
     modified = false
     exitstatus = nil
-    error_msg = nil
+    err_msg = nil
     done = false
     retries = @retries
     until done
-      result = run_command(cmd.join)
-      switch(result[:exitstatus])
-      case 0:
+      result = self.run_command(cmd.join)
+      case result[:exitstatus]
+      when 0
         modified = true
         done = true
-      case 32:  # 'No such object'
+      when 32   # 'No such object'
         # DN got removed out from underneath us. Going to just accept this
         # failure for now, as unclear the complication in the logic to turn
         # around and add the entry is worth it.
-        error_msg = result[:stderr]
+        err_msg = result[:stderr]
         done = true
-      case 51: # 'Server is busy'
+      when 51  # 'Server is busy'
         if (retries == 0)
-          error_msg = result[:stderr]
+          err_msg = result[:stderr]
           done = true
         end
       else
-        error_msg = result[:stderr]
+        err_msg = result[:stderr]
         done = true
       end
       exitstatus = result[:exitstatus]
       retries -= 1
     end
 
-    { :success => modified, :exitstatus => exitstatus, :err_msg => error_msg }
+    { :success => modified, :exitstatus => exitstatus, :err_msg => err_msg }
   ensure
     ldif_file.close if ldif_file
     ldif_file.unlink if ldif_file
@@ -640,6 +760,49 @@ plugin_class = Class.new do
     end
   end
 
+  def parse_list_ldif(ldif_out)
+#dn: simpkvKey=key1,ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp
+#objectClass: simpkvEntry
+#objectClass: top
+#simpkvKey: key1
+#simpkvJsonValue: {"value":"key1 value","metadata":{}}
+#
+#dn: ou=app1,ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp
+#ou: app1
+#objectClass: top
+#objectClass: organizationalUnit
+#
+#dn: ou=app2,ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp
+#ou: app2
+#objectClass: top
+#objectClass: organizationalUnit
+    folders = []
+    keys = {}
+    ldif_out.split(/^dn: /).each do |ldif|
+      next if ldif.strip.empty?
+      if ldif.match(/objectClass: organizationalUnit/i)
+        folders << ldif.split("\n").first.strip
+      elsif ldif.match(/objectClass: simpkvEntry/i)
+        key_match = ldif.match(/simpkvKey: (\S+)/i)
+        if key_match
+puts ldif
+          key = key_match[1]
+          value_match = ldif.match(/simpkvJsonValue: (\{.+?\})\n/i)
+          if value_match
+            keys[key] = value_match[1]
+          else
+             Puppet.debug("simpkvEntry missing simpkvJsonValue:\n#{ldif}")
+          end
+        else
+           Puppet.debug("simpkvEntry missing simpkvKey:\n#{ldif}")
+        end
+      else
+        Puppet.debug("Found unexpected object in simpkv tree:\n#{ldif}")
+      end
+    end
+    { :keys => keys, :folders => folders }
+  end
+
   # verifies ldap commands exists and can access the LDAP server at
   # the base DN
   #
@@ -665,30 +828,5 @@ plugin_class = Class.new do
       raise(err_msg)
     end
   end
-
-   # command should not contain pipes, as they can cause inconsistent
-   # results
-   def run_command(command)
-      Puppet.debug( "Executing: #{command}" )
-      out_pipe_r, out_pipe_w = IO.pipe
-      err_pipe_r, err_pipe_w = IO.pipe
-      pid = spawn(command, :out => out_pipe_w, :err => err_pipe_w)
-      out_pipe_w.close
-      err_pipe_w.close
-
-      Process.wait(pid)
-      exitstatus = $?.nil? ? nil : $?.exitstatus
-      stdout = out_pipe_r.read
-      out_pipe_r.close
-      stderr = err_pipe_r.read
-      err_pipe_r.close
-
-      {
-        :success    => (exitstatus == 0),
-        :exitstatus => exitstatus,
-        :stdout     => stdout,
-        :stderr     => stderr
-      }
-    end
-
 end
+
