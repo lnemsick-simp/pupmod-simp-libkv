@@ -1,6 +1,15 @@
-# Copy this file to <plugin name>_plugin.rb and address the FIXMEs
+# Copy this file to <your module>/lib/puppet_x/simpkv/<plugin type>_plugin.rb,
+# read all the documentation in this file and address the FIXMEs.
 #
-# REMINDERS:
+###############################################################################
+# SIMPKV PLUGIN REQUIREMENTS
+# - The plugin type derived from the plugin's base filename must be unique
+#   over **all** plugins loaded.
+#   - The simpkv adapter will only load the first plugin it finds of any given
+#     type.
+#   - The simpkv adapter will emit a warning when multiple plugin files for the
+#     same type are detected.
+#
 # - The plugin code must implement the API in this template.
 #
 # - The plugin code must protect from cross-puppet-environment contamination.
@@ -24,34 +33,37 @@
 # - When accessing the backend in the put(), get(), ... methods, the plugin code
 #   should catch exceptions, convert them to meaningful error messages and then
 #   return the failed status in its public API.
+###############################################################################
 
-# DO NOT CHANGE THIS LINE!!!!
+
 # Each plugin **MUST** be an anonymous class accessible only through
 # a `plugin_class` local variable.
+# DO NOT CHANGE THE LINE BELOW!!!!
 plugin_class = Class.new do
 
   # WARNING:
-  # In typical Ruby code, using constants and class methods are quite typical.
+  # In typical Ruby code, using constants and class methods is quite normal.
   # Unfortunately, you cannot use constants or class methods in an anonymous
-  # class, as they will be added to the Class Object, itself, and will
-  # not be available to the anonymous class. In other words, you will
-  # be tearing your hair out trying to figure out why normal code does
-  # not work!
+  # class, as they will be added to the Class Object, itself, and will not be
+  # available to the anonymous class. In other words, you will be tearing your
+  # hair out trying to figure out why normal Ruby code does not work here!
 
   ###### Public Plugin API ######
 
-  # @return String. backend type
-  def self.type
-    # This is the value that will be in the 'type' attribute of a configuration
-    # block for this plugin.  The simpkv adapter uses to select the plugin class to
-    # use in order to create a plugin instance.
-    # This **MUST** be unique across all loaded plugins.  Only the first
-    # plugin of a particular type will be loaded!
-    'FIXME'
+  # Construct an instance of this plugin setting its instance name
+  #
+  # @param name Name to ascribe to this plugin instance
+  #
+  def initialize(name)
+    # save this off, because the simpkv adapter will access it through a getter
+    # (defined below), when constructing log messages
+    @name = name
+
+    # You can use the Puppet object for logging
+    Puppet.debug("#{@name} simpkv plugin configured")
   end
 
-
-  # Construct an instance of this plugin using global and plugin-specific
+  # Configure this plugin instance using global and plugin-specific
   # configuration found in options
   #
   # FIXME:  The description below is informational for you as a developer.
@@ -93,19 +105,15 @@ plugin_class = Class.new do
   #     }
   #   }
   #
-  # @param name Name to ascribe to this plugin instance
   # @param options Hash of global simpkv and backend-specific options
   # @raise RuntimeError if any required configuration is missing from options
   #   or this object can't set up any stateful objects it needs to do its work
   #   (e.g., file directory, connection to a backend)
-  def initialize(name, options)
-    # save this off, because the simpkv adapter will access it through a getter
-    # (defined below) when constructing log messages
-    @name = name
+  def configure(options)
 
     # FIXME: insert validation and set up code here
 
-    Puppet.debug("#{@name} simpkv plugin constructed")
+    Puppet.debug("#{@name} simpkv plugin configured")
   end
 
   # @return unique identifier assigned to this plugin instance
@@ -113,21 +121,21 @@ plugin_class = Class.new do
     @name
   end
 
-
   # The remaining methods in this API map one-for-one to those in
   # simpkv's Puppet function API.
   #
-  # IMPORTANT NOTES:
+  # IMPORTANT API NOTES:
   #
-  # - An instance of this plugin class will persist through a single catalog run.
+  # - An instance of this plugin class will persist through a single catalog
+  #   run.
   # - Other instances of this plugin class may be running concurrently in
   #   the same process.
   #
   #   * Make sure your code is multi-thread safe if you are using any
   #     mechanisms that would cause concurrency problems!
   #
-  # - All values persisted and returned are Strings.  Other software in the
-  #   simpkv function chain is responsible for serializing non-String
+  # - All key values persisted and returned are Strings.  Other software in
+  #   the simpkv function chain is responsible for serializing non-String
   #   values into Strings for plugins to persist and then deserializing
   #   Strings retrieved by plugins back into objects.
   #
@@ -151,7 +159,8 @@ plugin_class = Class.new do
   #   operations.
   #
   #   * The simpkv adapter does not currently protect against hung operations.
-  #   * Only you have domain knowledge to know when a retry is appropriate.
+  #   * Only you have domain knowledge to know when a connection is hug
+  #     and when a retry of a failed operaton is appropriate.
 
   # Deletes a `key` from the configured backend.
   #

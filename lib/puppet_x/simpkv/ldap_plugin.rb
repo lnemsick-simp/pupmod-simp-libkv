@@ -2,27 +2,34 @@
 #
 # Each plugin **MUST** be an anonymous class accessible only through
 # a `plugin_class` local variable.
+# DO NOT CHANGE THE LINE BELOW!!!!
 plugin_class = Class.new do
   require 'facter'
   require 'pathname'
   require 'set'
 
-  # Reminder:  Do **NOT** try to set constants in this Class.new block.
-  #            They don't do what you expect (are not accessible within
-  #            any class methods) and pollute the Object namespace.
+  # NOTES FOR MAINTAINERS:
+  # - See simpkv/lib/puppet_x/simpkv/plugin_template.rb for important
+  #   information about plugin responsibilties and restrictions.
+  # - One OBTW that will drive you crazy are limitations on anonymous classes.
+  #   In typical Ruby code, using constants and class methods is quite normal.
+  #   Unfortunately, you cannot use constants or class methods in an anonymous
+  #   class, as they will be added to the Class Object, itself, and will not be
+  #   available to the anonymous class. In other words, you will be tearing your
+  #   hair out trying to figure out why normal Ruby code does not work here!
 
   ###### Public Plugin API ######
 
-#FIXME This is poluting the Class namespace and may not work
-#for each intance
-  # @return String. backend type
-  def self.type
-require 'pry'
-binding.pry
-    'ldap'
+  # Construct an instance of this plugin setting its instance name
+  #
+  # @param name Name to ascribe to this plugin instance
+  #
+  def initialize(name)
+    @name = name
+    Puppet.debug("#{@name} simpkv plugin configured")
   end
 
-  # Construct an instance of this plugin using global and plugin-specific
+  # Configure this plugin instance using global and plugin-specific
   # configuration found in options
   #
   # The plugin-specific configuration will be found in
@@ -64,7 +71,6 @@ binding.pry
   # @raise RuntimeError if any required configuration is missing from options
   #   FIXME other failures
   def initialize(name, options)
-    @name = name
 
     # Maintain list of folders that already exist to reduce the number of
     # unnecessary ldap add operations over the lifetime of this plugin instance
@@ -93,7 +99,7 @@ binding.pry
     verify_ldap_setup
     ensure_instance_tree
 
-    Puppet.debug("#{@name} simpkv plugin constructed")
+    Puppet.debug("#{@name} simpkv plugin configured")
   end
 
   # @return unique identifier assigned to this plugin instance
