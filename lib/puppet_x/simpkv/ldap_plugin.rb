@@ -70,7 +70,7 @@ plugin_class = Class.new do
   # @param options Hash of global simpkv and backend-specific options
   # @raise RuntimeError if any required configuration is missing from options
   #   FIXME other failures
-  def initialize(name, options)
+  def configure(options)
 
     # Maintain list of folders that already exist to reduce the number of
     # unnecessary ldap add operations over the lifetime of this plugin instance
@@ -249,9 +249,6 @@ plugin_class = Class.new do
     done = false
     retries = @retries
     until done
-puts methods.sort
-require 'pry'
-binding.pry
       result = self.run_command(cmd.join)
       case result[:exitstatus]
       when 0

@@ -29,47 +29,34 @@ describe 'simpkv ldap plugin anonymous class' do
     }
 
     @plugin_name = 'ldap/test'
+    @plugin =  plugin_class.new(@plugin_name)
   end
 
   after(:each) do
     FileUtils.remove_entry_secure(@tmpdir)
   end
 
-  context 'type' do
-    it "class.type should return 'ldap'" do
-puts '>'*80
-puts plugin_class.methods.each { |method_name| puts method_name }
-puts '<'*80
-
-      expect(plugin_class.type).to eq 'ldap'
+  context 'constructor' do
+    it 'is expected to set name' do
+      expect(@plugin.name).to eq @plugin_name
     end
   end
 
-  context 'run_command' do
-  end
-
-  context 'constructor' do
+  context 'configure' do
     context 'success cases' do
       before(:each) do
-        allow(Facter::Core::Execution).to receive(:which).with('ldapsearch').and_return('/usr/bin/ldapsearch')
-        allow(Facter::Core::Execution).to receive(:which).with('ldapadd').and_return('/usr/bin/ldapadd')
-        allow(Facter::Core::Execution).to receive(:which).with('ldapmodify').and_return('/usr/bin/ldapmodify')
-        allow(Facter::Core::Execution).to receive(:which).with('ldapdelete').and_return('/usr/bin/ldapdelete')
+        expect(@plugin).to receive(:verify_ldap_setup)
+        expect(@plugin).to receive(:ensure_instance_tree)
       end
 
       context 'with default parameters' do
         it 'should succeed using minimal ldap config' do
-          expect(plugin_class).to receive(:run_command).with('').and_return({:exitstatus => 0, :stdout => 'dn: ou=simpkv,o=puppet,dc=simp'})
-          expect{ plugin_class.new(@plugin_name, @options) }.to_not raise_error
+          expect{ @plugin.configure(@options) }.to_not raise_error
         end
 
         it 'should succeed using minimal ldapi config'
         it 'should succeed using minimal ldaps config'
         it 'should succeed using minimal ldap + StartTLS config'
-
-
-        it 'should create instance tree when it does not exist'
-        it 'should not fail when instance tree exists'
       end
 
       context 'with custom parameters' do
@@ -80,13 +67,17 @@ puts '<'*80
     end
 
     context 'error cases' do
+        #allow(Facter::Core::Execution).to receive(:which).with('ldapsearch').and_return('/usr/bin/ldapsearch')
+        #allow(Facter::Core::Execution).to receive(:which).with('ldapadd').and_return('/usr/bin/ldapadd')
+        #allow(Facter::Core::Execution).to receive(:which).with('ldapmodify').and_return('/usr/bin/ldapmodify')
+        #allow(Facter::Core::Execution).to receive(:which).with('ldapdelete').and_return('/usr/bin/ldapdelete')
       it 'should fail when options is not a Hash' do
-        expect { plugin_class.new(@plugin_name, 'oops') }.
+        expect { @plugin.configure('oops') }.
           to raise_error(/Plugin misconfigured/)
       end
 
       it "should fail when options missing 'backend' key" do
-        expect { plugin_class.new(@plugin_name, {} ) }.
+        expect { @plugin.configure({}) }.
           to raise_error(/Plugin misconfigured/)
       end
 
@@ -94,7 +85,7 @@ puts '<'*80
         options = {
           'backend' => 'test'
         }
-        expect { plugin_class.new(@plugin_name, options) }.
+        expect { @plugin.configure(options) }.
           to raise_error(/Plugin misconfigured: {.*backend.*}/)
       end
 
@@ -103,7 +94,7 @@ puts '<'*80
           'backend'  => 'test',
           'backends' => 'oops'
         }
-        expect { plugin_class.new(@plugin_name, options) }.
+        expect { @plugin.configure(options) }.
           to raise_error(/Plugin misconfigured/)
       end
 
@@ -114,7 +105,7 @@ puts '<'*80
             'test1' => { 'id' => 'test', 'type' => 'consul'}
           }
         }
-        expect { plugin_class.new(@plugin_name, options) }.
+        expect { @plugin.configure(options) }.
           to raise_error(/Plugin misconfigured/)
       end
 
@@ -126,7 +117,7 @@ puts '<'*80
             'test'  => {}
           }
         }
-        expect { plugin_class.new(@plugin_name, options) }.
+        expect { @plugin.configure(options) }.
           to raise_error(/Plugin misconfigured/)
       end
 
@@ -138,7 +129,7 @@ puts '<'*80
             'test'  => { 'id' => 'test' }
           }
         }
-        expect { plugin_class.new(@plugin_name, options) }.
+        expect { @plugin.configure(options) }.
           to raise_error(/Plugin misconfigured/)
       end
 
@@ -150,11 +141,9 @@ puts '<'*80
             'test'  => { 'id' => 'test', 'type' => 'ldapx' }
           }
         }
-        expect { plugin_class.new(@plugin_name, options) }.
+        expect { @plugin.configure(options) }.
           to raise_error(/Plugin misconfigured/)
       end
-
-
     end
   end
 
