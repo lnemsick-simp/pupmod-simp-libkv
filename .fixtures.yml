@@ -1,6 +1,12 @@
 ---
 fixtures:
   repositories:
+    ds389:  "https://github.com/simp/pupmod-simp-ds389.git"
+    pki: "https://github.com/simp/pupmod-simp-pki.git"
+    selinux: "https://github.com/simp/pupmod-simp-selinux.git"
+    vox_selinux:
+      repo: "https://github.com/simp/pupmod-voxpupuli-selinux.git"
+      branch: simp-master
     stdlib:   "https://github.com/simp/puppetlabs-stdlib.git"
     simplib:  "https://github.com/simp/pupmod-simp-simplib.git"
     # This needs to be in place for the rspec-puppet Hiera 5 hook to work

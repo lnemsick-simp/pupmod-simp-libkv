@@ -1,0 +1,44 @@
+# 70simpkv.ldif - Used for simpkv entries
+################################################################################
+#
+dn: cn=schema
+#
+################################################################################
+#
+attributeTypes: (
+  1.3.6.1.4.1.47012.1.1.1.1.1.1
+  NAME 'simpkvKey'
+  DESC 'key'
+  SUP name
+  SINGLE-VALUE
+  X-ORIGIN 'SIMP simpkv'
+  )
+#
+################################################################################
+#
+attributeTypes: (
+  1.3.6.1.4.1.47012.1.1.1.1.1.2
+  NAME 'simpkvJsonValue'
+  DESC 'JSON-formatted value'
+  EQUALITY caseExactMatch
+  SUBSTR caseExactSubstringsMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  SINGLE-VALUE
+  X-ORIGIN 'SIMP simpkv'
+  )
+#
+################################################################################
+#
+objectClasses: (
+  1.3.6.1.4.1.47012.1.1.1.1.2.1
+  NAME 'simpkvEntry'
+  DESC 'simpkv entry'
+  SUP top
+  STRUCTURAL
+  MUST ( simpkvKey $ simpkvJsonValue )
+  X-ORIGIN 'SIMP simpkv'
+  )
+#
+################################################################################
+#
+
