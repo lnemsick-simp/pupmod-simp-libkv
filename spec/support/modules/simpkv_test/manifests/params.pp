@@ -27,5 +27,7 @@ class simpkv_test::params (
                                               $test_hash_key           => $test_hash },
 
   Hash           $test_meta               = { 'some' => 'metadata' },
-  Hash           $simpkv_options           = { 'app_id' => 'simpkv_test_class' }
+
+  # app_id can be **any** string, just making it look like a catalog class resource
+  Hash           $simpkv_options           = { 'app_id' => 'Class[Simpkv_test::Put]' }
 ) { }

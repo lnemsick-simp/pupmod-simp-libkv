@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+=begin
+
 require 'spec_helper_acceptance'
 
 test_name 'ldap_plugin using ldapi'
@@ -133,3 +135,4 @@ describe 'ldap_plugin using ldapi' do
     end
   end
 end
+=end
