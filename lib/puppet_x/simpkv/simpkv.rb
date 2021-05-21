@@ -73,8 +73,10 @@ simp_simpkv_adapter_class = Class.new do
             @plugin_info[plugin_type][:source]
           Puppet.warning(msg)
         else
-          @plugin_info[plugin_type][:class] = plugin_class
-          @plugin_info[plugin_type][:source] = filename
+          @plugin_info[plugin_type] = {
+            :class  => plugin_class,
+            :source => filename
+          }
         end
       rescue SyntaxError => e
         Puppet.warning("simpkv plugin from #{filename} failed to load: #{e.message}")

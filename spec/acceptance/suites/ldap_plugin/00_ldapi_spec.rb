@@ -18,6 +18,11 @@ describe 'ldap_plugin using ldapi' do
         on(host, "hostname #{fact_on(host, 'fqdn')}")
         on(host, 'hostname -f > /etc/hostname')
       end
+
+#FIXME remove this when done debugging
+      it 'has vim installed' do
+        on(host, 'yum install -y vim')
+      end
     end
   end
 
@@ -70,31 +75,61 @@ describe 'ldap_plugin using ldapi' do
         on(host, "egrep 'ERR\s*-\s*schemareload' /var/log/dirsrv/slapd-#{ldap_instance}/errors",
           :acceptable_exit_codes => [1])
       end
-
-=begin
-        it 'can login to 389DS via LDAPI' do
-          on(host, %(ldapsearch -x -y "#{root_dn_password_file}" -D "cn=Directory_Manager" -H ldapi://%2fvar%2frun%2fslapd-#{ds_root_name}.socket -b "cn=tasks,cn=config"))
-        end
-
-        it 'contains the default entries' do
-          domain = on(host, %(puppet apply --color=none -e '$dn = simplib::ldap::domain_to_dn($facts["domain"], true); notice("DOMAIN => ${dn}")'))
-                   .stdout
-                   .lines
-                   .grep(%r{DOMAIN =>})
-                   .first
-                   .split('=> ')
-                   .last
-                   .strip
-
-          result = on(host, %(ldapsearch -x -y "#{root_dn_password_file}" -D "cn=Directory_Manager" -H ldapi://%2fvar%2frun%2fslapd-#{ds_root_name}.socket -b "#{domain}")).output
-
-          expect(result.lines.grep(%r{cn=administrators,ou=Group,#{domain}})).not_to be_empty
-        end
-=end
-
     end
 
     context "simpkv ldap_plugin on #{host} using ldapi" do
+      # can't count on the root password file
+      let(:admin_pw_file) { '/etc/simp/simpkv_pw.txt' }
+      let(:hieradata) {{
+
+        'simpkv::backend::ldap_default' => {
+          'type'      => 'ldap',
+          'id'        => 'default',
+          'ldap_uri'  => "ldapi://%2fvar%2frun%2fslapd-#{ldap_instance}.socket",
+          'admin_pw_file' =>  admin_pw_file
+        },
+        'simpkv::options' => {
+          'environment' => '%{server_facts.environment}',
+          'softfail'    => false,
+          'backends'    => {
+            'default'=> "%{alias('simpkv::backend::ldap_default')}"
+          }
+        }
+      }}
+
+      let(:manifest) { <<-EOM
+        file { '/etc/simp': ensure => 'directory' }
+
+        file { '#{admin_pw_file}':
+          ensure  => present,
+          owner   => 'root',
+          group   => 'root',
+          mode    => '0400',
+          content => Sensitive('#{root_pw}')
+        }
+        File['#{admin_pw_file}'] -> Class['simpkv_test::put']
+
+        # Calls simpkv::put directly and via a Puppet-language function
+        # * Stores values of different types.  Binary content is handled
+        #   via a separate test.
+        # * One of the calls to the Puppet-language function will go to the
+        #   default backend
+        class { 'simpkv_test::put': }
+
+        # These two defines call simpkv::put directly and via the Puppet-language
+        # function
+        # * The 'define1' put operations should use the 'ldap/define_instance'
+        #   backend instance.
+        # * The 'define2' put operations should use the 'ldap/define_type'
+        simpkv_test::defines::put { 'define1': }
+        simpkv_test::defines::put { 'define2': }
+      EOM
+      }
+
+      it 'should work with no errors' do
+        set_hieradata_on(host, hieradata)
+        apply_manifest_on(host, manifest, :catch_failures => true)
+      end
     end
   end
 end

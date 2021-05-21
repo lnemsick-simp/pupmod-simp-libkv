@@ -133,7 +133,7 @@ plugin_class = Class.new do
     done = false
     retries = @retries
     until done
-      result = self.run_command(cmd.join)
+      result = run_command(cmd.join(' '))
       case result[:exitstatus]
       when 0
         deleted = true
@@ -181,7 +181,7 @@ plugin_class = Class.new do
     done = false
     retries = @retries
     until done
-      result = self.run_command(cmd.join)
+      result = run_command(cmd.join(' '))
       case result[:exitstatus]
       when 0
         deleted = true
@@ -249,7 +249,7 @@ plugin_class = Class.new do
     done = false
     retries = @retries
     until done
-      result = self.run_command(cmd.join)
+      result = run_command(cmd.join(' '))
       case result[:exitstatus]
       when 0
         # Parent DN exists, but search may or may not have returned a result.
@@ -298,7 +298,7 @@ plugin_class = Class.new do
     done = false
     retries = @retries
     until done
-      result = self.run_command(cmd.join)
+      result = run_command(cmd.join(' '))
       case result[:exitstatus]
       when 0
           match = result[:stdout].match(/^simpkvJsonValue: (.*?)$/)
@@ -365,7 +365,7 @@ plugin_class = Class.new do
     done = false
     retries = @retries
     until done
-      result = self.run_command(cmd.join)
+      result = run_command(cmd.join(' '))
       case result[:exitstatus]
       when 0
         ldif_out = result[:stdout]
@@ -460,7 +460,7 @@ plugin_class = Class.new do
   ###### Internal Methods ######
   # command should not contain pipes, as they can cause inconsistent
   # results
-  def self.run_command(command)
+  def run_command(command)
     Puppet.debug( "Executing: #{command}" )
     out_pipe_r, out_pipe_w = IO.pipe
     err_pipe_r, err_pipe_w = IO.pipe
@@ -514,11 +514,12 @@ plugin_class = Class.new do
     folders_added = true
     results = nil
     Pathname.new(folder_path).descend do |folder|
-      next if @existing_folders.include?(folder)
-      ldif = folder_add_ldif(folder)
+      folder_str = folder.to_s
+      next if @existing_folders.include?(folder_str)
+      ldif = folder_add_ldif(folder_str)
       ldap_results = ldap_add(ldif, true)
       if ldap_results[:success]
-        @existing_folders.add(folder)
+        @existing_folders.add(folder_str)
       else
         folders_added = false
         results = {
@@ -553,7 +554,7 @@ plugin_class = Class.new do
     done = false
     retries = @retries
     until done
-      result = self.run_command(cmd.join)
+      result = run_command(cmd.join(' '))
       case result[:exitstatus]
       when 0
         added = true
@@ -602,7 +603,7 @@ plugin_class = Class.new do
     done = false
     retries = @retries
     until done
-      result = self.run_command(cmd.join)
+      result = run_command(cmd.join(' '))
       case result[:exitstatus]
       when 0
         modified = true
@@ -743,16 +744,16 @@ plugin_class = Class.new do
 
       if ldap_uri.match(/^ldap:/)
         # StartTLS
-        @base_opts = "-ZZ -x -D #{admin_dn} -y #{admin_pw_file} -H #{@ldap_uri}"
+        @base_opts = "-ZZ -x -D #{admin_dn} -y #{admin_pw_file} -H #{ldap_uri}"
       else
         # TLS
-        @base_opts = "-x -D #{admin_dn} -y #{admin_pw_file} -H #{@ldap_uri}"
+        @base_opts = "-x -D #{admin_dn} -y #{admin_pw_file} -H #{ldap_uri}"
       end
 
     else
       # unencrypted ldap or ldapi
       @cmd_env = ''
-      @base_opts = "-x -D #{admin_dn} -y #{admin_pw_file} -H #{@ldap_uri}"
+      @base_opts = "-x -D #{admin_dn} -y #{admin_pw_file} -H #{ldap_uri}"
     end
 
     if config.key?('retries')

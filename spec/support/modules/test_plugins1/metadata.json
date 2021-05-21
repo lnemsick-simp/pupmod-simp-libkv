@@ -1,0 +1,18 @@
+{
+  "name": "simp-test_plugins1",
+  "version": "9.9.9",
+  "author": "simp",
+  "summary": "plugins for simpkv error testing",
+  "license": "Apache-2.0",
+  "source": "https://github.com/simp/pupmod-simp-simpkv",
+  "project_page": "https://github.com/simp/pupmod-simp-simpkv",
+  "issues_url": "https://simp-project.atlassian.net",
+  "tags": [],
+  "dependencies": [],
+  "requirements": [
+    {
+      "name": "puppet",
+      "version_requirement": ">= 6.0.0 < 8.0.0"
+    }
+  ]
+}
