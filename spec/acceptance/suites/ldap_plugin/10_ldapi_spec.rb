@@ -30,23 +30,23 @@ describe 'ldap_plugin using ldapi' do
 
   hosts_with_role(hosts, 'ldap_server').each do |host|
     context "simpkv ldap_plugin on #{host} using ldapi" do
-      it_behaves_like 'simpkv functions test', host do
-        let(:common_ldap_config) {{
-          'ldap_uri'      => "ldapi://%2fvar%2frun%2fslapd-#{ldap_instance}.socket",
-          'admin_pw_file' =>  admin_pw_file
-        }}
+      let(:common_ldap_config) {{
+        'ldap_uri'      => "ldapi://%2fvar%2frun%2fslapd-#{ldap_instance}.socket",
+        'admin_pw_file' =>  admin_pw_file
+      }}
 
-        let(:options) {{
-          :type            => 'ldap',
-          :backend_configs => {
-            # All backend instances are using same LDAP server
-            :class_keys           => common_ldap_config,
-            :specific_define_keys => common_ldap_config,
-            :define_keys          => common_ldap_config,
-            :default              => common_ldap_config
-          }
-        }}
-      end
+      let(:options) {{
+        :type            => 'ldap',
+        :backend_configs => {
+          # All backend instances are using same LDAP server
+          :class_keys           => common_ldap_config,
+          :specific_define_keys => common_ldap_config,
+          :define_keys          => common_ldap_config,
+          :default              => common_ldap_config
+        }
+      }}
+
+      it_behaves_like 'simpkv functions test', host
     end
   end
 end
