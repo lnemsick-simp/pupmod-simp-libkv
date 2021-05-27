@@ -387,7 +387,7 @@ plugin_class = Class.new do
 
     list = nil
     unless ldif_out.nil?
-      if ldif_out.empty
+      if ldif_out.empty?
         list = { :keys => {}, :folders => [] }
       else
         list = parse_list_ldif(ldif_out)
