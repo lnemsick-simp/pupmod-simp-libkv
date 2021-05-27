@@ -30,7 +30,7 @@ describe 'ldap_plugin using ldapi' do
 
   hosts_with_role(hosts, 'ldap_server').each do |host|
     context "simpkv ldap_plugin on #{host} using ldapi" do
-      it_behaves_like 'simpkv functions test' do |host|
+      it_behaves_like 'simpkv functions test', host do
         let(:common_ldap_config) {{
           'ldap_uri'      => "ldapi://%2fvar%2frun%2fslapd-#{ldap_instance}.socket",
           'admin_pw_file' =>  admin_pw_file
