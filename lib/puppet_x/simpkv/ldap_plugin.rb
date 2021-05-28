@@ -355,7 +355,7 @@ plugin_class = Class.new do
       @ldapsearch,
       @base_opts,
 # FIXME if @base_dn is configured, could have characters to be escaped?
-      '-b', path_to_dn(full_keydir_path),
+      '-b', path_to_dn(full_keydir_path, false),
       '-s', 'one',
       @search_opts
     ]
@@ -494,6 +494,8 @@ plugin_class = Class.new do
   #   | --
   #   --
   def ensure_instance_tree
+#FIXME fix this once the simpkv_adapter adds globals and environments to the path
+=begin
     [
       File.join(@instance_path, 'globals'),
       File.join(@instance_path, 'environments')
@@ -504,6 +506,7 @@ plugin_class = Class.new do
       # operation.
       ensure_folder_path(folder)
     end
+=end
   end
 
   # Ensure all folders in a folder path are present.
@@ -785,11 +788,16 @@ plugin_class = Class.new do
     ldif_out.split(/^dn: /).each do |ldif|
       next if ldif.strip.empty?
       if ldif.match(/objectClass: organizationalUnit/i)
-        folders << ldif.split("\n").first.strip
+        rdn = ldif.split("\n").first.split(',').first
+        folder_match = rdn.match(/^ou=(\S+)$/)
+        if folder_match
+          folders << folder_match[1]
+        else
+          Puppet.debug("Unexpected organizationalUnit entry:\n#{ldif}")
+        end
       elsif ldif.match(/objectClass: simpkvEntry/i)
         key_match = ldif.match(/simpkvKey: (\S+)/i)
         if key_match
-puts ldif
           key = key_match[1]
           value_match = ldif.match(/simpkvJsonValue: (\{.+?\})\n/i)
           if value_match
