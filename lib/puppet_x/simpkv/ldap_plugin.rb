@@ -173,7 +173,7 @@ plugin_class = Class.new do
       @base_opts,
       '-r',
 # FIXME if @base_dn is configured, could have characters to be escaped?
-      path_to_dn(full_keydir_path)
+      path_to_dn(full_keydir_path, false)
     ]
 
     deleted = false
