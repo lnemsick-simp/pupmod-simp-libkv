@@ -3,25 +3,53 @@
 # - Uses a set of backend instances of the specified simpkv plugin type to
 #   verify app_id-based backend selection. (See hieradata description block
 #   below)
-# - Uses the simpkv_test module to use the simpkv::* functions and to
+# - Uses the simpkv_test module to exercise the simpkv::* functions and to
 #   verify their operation independent of the backend type used.
+#   - The simpkv_test module exclusively uses simpkv functions for store/retrieve
+#     operations.
+#   - Use of simpkv functions provides a self-consistency check.
+# - Uses backend-specific validator function to independently verify the keys
+#   and folders are present/absent in the backend.
+#   - Necessary to ensure store/retrieve operations are going where we think
+#     they are going!
 #
 # @param host Host object
 #
 # Assumed available context:
 #   options = Test options hash
 #   {
-#     :type            => '<plugin type>',
 #     :backend_configs => {
 #       # Plugin specific config for each backend;
-#       # Will be merged with base config.
+#       # - Backends can be any mix of types
+#       # - Each config must include 'type' attribute
 #       :class_keys           => { },
 #       :specific_define_keys => { },
 #       :define_keys          => { },
 #       :default              => { }
-#     }
+#     },
+#     :validator => <Method object that can be called to independently validate
+#                    backend state>
 #   }
+#
+#   Validator method will return a Boolean and will be called with the following
+#   arguments:
+#   - path to check
+#   - path type (:key, :folder)
+#   - puppet environment: string for a Puppet environment key, nil for a global key
+#   - check operation (:present, :absent)
+#   - backend configuration hash
+#   - Host object on which validation commands will be executed
+#
 shared_examples 'simpkv functions test' do |host|
+
+  let(:backend_configs) {
+    configs = Marshal.load(Marshal.dump(options[:backend_configs]))
+    configs[:class_keys]['id'] = 'class_keys'
+    configs[:specific_define_keys]['id'] = 'specific_define_keys'
+    configs[:define_keys]['id'] = 'define_keys'
+    configs[:default]['id'] = 'default'
+    configs
+  }
 
   let(:hieradata) {{
 
@@ -45,33 +73,20 @@ shared_examples 'simpkv functions test' do |host|
 
     # Backend for keys stored via simpkv::put() with app_id='Class[Simpkv::Put]'
     # ==> most of the keys stored in the simpkv_test::put class
-    'simpkv::backend::class_keys' => {
-      'type'      => options[:type],
-      'id'        => 'class_keys'
-    }.merge(options[:backend_configs][:class_keys]),
+    'simpkv::backend::class_keys' => backend_configs[:class_keys],
 
     # Backend for keys stored via simpkv::put() with app_id='Simpkv::Defines::Put[define2]'
     # ==> keys stored in the 'define2' instance of the simpkv_test::defines::put define
-    'simpkv::backend::specific_define_keys' => {
-      'type'      => options[:type],
-      'id'        => 'specific_define_keys'
-    }.merge(options[:backend_configs][:specific_define_keys]),
-
+    'simpkv::backend::specific_define_keys' => backend_configs[:specific_define_keys],
 
     # Backend for keys stored via simpkv::put() with app_id matching
     # 'Simpkv::Defines::Put'
     # ==> keys stored in any other instance of the simpkv_test::defines::put define
-    'simpkv::backend::define_keys' => {
-      'type'      => options[:type],
-      'id'        => 'define_keys'
-    }.merge(options[:backend_configs][:define_keys]),
+    'simpkv::backend::define_keys' => backend_configs[:define_keys],
 
     # Backend for keys stored via simpkv::put() without an app_id or an app_id
     # that doesn't match anything else
-    'simpkv::backend::default' => {
-      'type'      => options[:type],
-      'id'        => 'default'
-    }.merge(options[:backend_configs][:default]),
+    'simpkv::backend::default' => backend_configs[:default],
 
    'simpkv::options' => {
       'environment' => '%{server_facts.environment}',
@@ -97,9 +112,9 @@ shared_examples 'simpkv functions test' do |host|
 
     # These two defines call simpkv::put directly and via the Puppet-language
     # function
-    # * The 'define1' put operations should use the 'specific_define_keys'
+    # * The 'define1' put operations should use the 'define_keys'
     #   backend instance.
-    # * The 'define2' put operations should use the 'define_keys'
+    # * The 'define2' put operations should use the 'specific_define_keys'
     #   backend instance.
     simpkv_test::defines::put { 'define1': }
     simpkv_test::defines::put { 'define2': }
@@ -111,39 +126,106 @@ shared_examples 'simpkv functions test' do |host|
       apply_manifest_on(host, manifest, :catch_failures => true)
     end
 
-=begin
-# FIXME need insert point to call validation function
-    [
-      '/var/simp/simpkv/file/class/production/from_class/boolean',
-      '/var/simp/simpkv/file/class/production/from_class/string',
-      '/var/simp/simpkv/file/class/production/from_class/integer',
-      '/var/simp/simpkv/file/class/production/from_class/float',
-      '/var/simp/simpkv/file/class/production/from_class/array_strings',
-      '/var/simp/simpkv/file/class/production/from_class/array_integers',
-      '/var/simp/simpkv/file/class/production/from_class/hash',
+    # The validation of the existence and content of the keys we just stored
+    # will be done in subsequent tests using simpkv::exists and simpkv::get.
+    # However, those tests are not plugin-specific and won't find issues in
+    # which we think we are storing the keys using one type of plugin, but
+    # instead are using another plugin (e.g., the default file plugin). So,
+    # we need to independently validate the keys were actually stored in
+    # the backend being tested. For simplicity, we are simply going to
+    # test for the existence of folders and keys in the backend.
+    {
+      :class_keys           => {
+        :global_folders     => [],
+        :global_keys        => [],
+        :production_folders => [
+          'from_class'
+        ],
+        :production_keys    => [
+          'from_class/boolean',
+          'from_class/string',
+          'from_class/integer',
+          'from_class/float',
+          'from_class/array_strings',
+          'from_class/array_integers',
+          'from_class/hash',
+          'from_class/boolean_with_meta',
+          'from_class/string_with_meta',
+          'from_class/integer_with_meta',
+          'from_class/float_with_meta',
+          'from_class/array_strings_with_meta',
+          'from_class/array_integers_with_meta',
+          'from_class/hash_with_meta',
+          'from_class/boolean_from_pfunction',
+        ]
+      },
+      :specific_define_keys => {
+        :global_folders     => [],
+        :global_keys        => [],
+        :production_folders => [
+          'from_define',
+          'from_define/define2'
+        ],
+        :production_keys    => [
+          'from_define/define2/string',
+          'from_define/define2/string_from_pfunction'
+        ]
+      },
+      :define_keys          => {
+        :global_folders     => [],
+        :global_keys        => [],
+        :production_folders => [
+          'from_define',
+          'from_define/define1'
+        ],
+        :production_keys    => [
+          'from_define/define1/string',
+          'from_define/define1/string_from_pfunction'
+        ]
+      },
+      :default              => {
+        :global_folders     => [],
+        :global_keys        => [],
+        :production_folders => [
+          'from_class'
+        ],
+        :production_keys    => [
+          'from_class/boolean_from_pfunction_no_app_id'
+        ]
+      }
+    }.each do |backend, data|
+      data[:global_folders].each do |folder|
+        it "should create '#{folder}' global folder in #{backend} backend" do
+          result = options[:validator].call(folder, :folder, nil, :present,
+            backend_configs[backend], host)
+          expect(result). to be true
+        end
+      end
 
-      '/var/simp/simpkv/file/class/production/from_class/boolean_with_meta',
-      '/var/simp/simpkv/file/class/production/from_class/string_with_meta',
-      '/var/simp/simpkv/file/class/production/from_class/integer_with_meta',
-      '/var/simp/simpkv/file/class/production/from_class/float_with_meta',
-      '/var/simp/simpkv/file/class/production/from_class/array_strings_with_meta',
-      '/var/simp/simpkv/file/class/production/from_class/array_integers_with_meta',
-      '/var/simp/simpkv/file/class/production/from_class/hash_with_meta',
+      data[:global_keys].each do |key|
+        it "should create '#{key}' global key in #{backend} backend" do
+          result = options[:validator].call(key, :key, nil, :present,
+            backend_configs[backend], host)
+          expect(result). to be true
+        end
+      end
 
-      '/var/simp/simpkv/file/class/production/from_class/boolean_from_pfunction',
-      '/var/simp/simpkv/file/default/production/from_class/boolean_from_pfunction_no_app_id',
+      data[:production_folders].each do |folder|
+        it "should create '#{folder}' production env folder in #{backend} backend" do
+          result = options[:validator].call(folder, :folder, 'production', :present,
+            backend_configs[backend], host)
+          expect(result). to be true
+        end
+      end
 
-      '/var/simp/simpkv/file/define_instance/production/from_define/define2/string',
-      '/var/simp/simpkv/file/define_instance/production/from_define/define2/string_from_pfunction',
-      '/var/simp/simpkv/file/define_type/production/from_define/define1/string',
-      '/var/simp/simpkv/file/define_type/production/from_define/define1/string_from_pfunction'
-    ].each do |file|
-      # validation of content will be done in 'get' test
-      it "should create #{file}" do
-        expect( file_exists_on(host, file) ).to be true
+      data[:production_keys].each do |key|
+        it "should create '#{key}' production env key in #{backend} backend" do
+          result = options[:validator].call(key, :key, 'production', :present,
+            backend_configs[backend], host)
+          expect(result). to be true
+        end
       end
     end
-=end
   end
 
   context 'simpkv exists operation' do

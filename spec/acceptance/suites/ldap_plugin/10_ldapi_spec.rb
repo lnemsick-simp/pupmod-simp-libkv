@@ -32,18 +32,20 @@ describe 'ldap_plugin using ldapi' do
     context "simpkv ldap_plugin on #{host} using ldapi" do
       let(:common_ldap_config) {{
         'ldap_uri'      => "ldapi://%2fvar%2frun%2fslapd-#{ldap_instance}.socket",
-        'admin_pw_file' =>  admin_pw_file
+        'base_dn'       => simpkv_base_dn,
+        'admin_dn'      => admin_dn,
+        'admin_pw_file' => admin_pw_file
       }}
 
       let(:options) {{
-        :type            => 'ldap',
         :backend_configs => {
-          # All backend instances are using same LDAP server
-          :class_keys           => common_ldap_config,
-          :specific_define_keys => common_ldap_config,
-          :define_keys          => common_ldap_config,
-          :default              => common_ldap_config
-        }
+          # All backend instances are of same type and use same LDAP server instance
+          :class_keys           => {'type' => 'ldap'}.merge(common_ldap_config),
+          :specific_define_keys => {'type' => 'ldap'}.merge(common_ldap_config),
+          :define_keys          => {'type' => 'ldap'}.merge(common_ldap_config),
+          :default              => {'type' => 'ldap'}.merge(common_ldap_config)
+        },
+        :validator       => validator
       }}
 
       it_behaves_like 'simpkv functions test', host

@@ -51,9 +51,6 @@ describe 'ldap server setup' do
 
       it 'works with no errors' do
         set_hieradata_on(host, hieradata)
-# FIXME WORKAROUND for package containing semanage not being installed
-# and therefore selinux_port not finding suitable provider
-        apply_manifest_on(host, manifest, expect_failures: true)
         apply_manifest_on(host, manifest, catch_failures: true)
       end
 

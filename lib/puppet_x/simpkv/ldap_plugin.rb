@@ -75,8 +75,8 @@ plugin_class = Class.new do
     # Maintain list of folders that already exist to reduce the number of
     # unnecessary ldap add operations over the lifetime of this plugin instance
     @existing_folders = Set.new
-    @instance_path = File.join('instances', @name)
-    @search_opts= '-o ldif_wrap=no -LLL'
+    @instance_path = File.join('instances', @name.gsub(%r{^ldap/},''))
+    @search_opts = '-o "ldif_wrap=no" -LLL'
 
     # backend config should already have been verified by simpkv adapter, but
     # just in case...
@@ -124,16 +124,15 @@ plugin_class = Class.new do
       @cmd_env,
       @ldapdelete,
       @base_opts,
-# FIXME if @base_dn is configured, could have characters to be escaped?
-      path_to_dn(full_key_path)
-    ]
+      %Q{"#{path_to_dn(full_key_path)}"}
+    ].join(' ')
 
     deleted = false
     err_msg = nil
     done = false
     retries = @retries
     until done
-      result = run_command(cmd.join(' '))
+      result = run_command(cmd)
       case result[:exitstatus]
       when 0
         deleted = true
@@ -172,16 +171,15 @@ plugin_class = Class.new do
       @ldapdelete,
       @base_opts,
       '-r',
-# FIXME if @base_dn is configured, could have characters to be escaped?
-      path_to_dn(full_keydir_path, false)
-    ]
+      %Q{"#{path_to_dn(full_keydir_path, false)}"}
+    ].join(' ')
 
     deleted = false
     err_msg = nil
     done = false
     retries = @retries
     until done
-      result = run_command(cmd.join(' '))
+      result = run_command(cmd)
       case result[:exitstatus]
       when 0
         deleted = true
@@ -199,6 +197,12 @@ plugin_class = Class.new do
         done = true
       end
       retries -= 1
+    end
+
+    if deleted
+      @existing_folders.delete(full_keydir_path)
+      parent_path = full_keydir_path + "/"
+      @existing_folders.delete_if { |path| path.start_with?(parent_path) }
     end
 
     { :result => deleted, :err_msg => err_msg }
@@ -223,7 +227,7 @@ plugin_class = Class.new do
       scope = '-s base'
     else
       # don't know if the key path is to a key or a folder so need to create a
-      # search filter for both an ou=RDN or simpkvKey=RDN.
+      # search filter for both an RDN of ou=<key> or an RD simpkvKey=<key>.
       full_key_path =  File.join(@instance_path, key)
       dn = path_to_dn(File.dirname(full_key_path), false)
       leaf = File.basename(key)
@@ -236,20 +240,19 @@ plugin_class = Class.new do
       @cmd_env,
       @ldapsearch,
       @base_opts,
-# FIXME if @base_dn is configured, could have characters to be escaped?
-      '-b', dn,
+      '-b', %Q{"#{dn}"},
       @search_opts,
       scope,
       %Q{"#{search_filter}"},
       '1.1'                   # only print out the dn, no attributes
-    ]
+    ].join(' ')
 
     found = false
     err_msg = nil
     done = false
     retries = @retries
     until done
-      result = run_command(cmd.join(' '))
+      result = run_command(cmd)
       case result[:exitstatus]
       when 0
         # Parent DN exists, but search may or may not have returned a result.
@@ -288,17 +291,16 @@ plugin_class = Class.new do
       @cmd_env,
       @ldapsearch,
       @base_opts,
-# FIXME if @base_dn is configured, could have characters to be escaped?
-      '-b', path_to_dn(full_key_path),
+      '-b', %Q{"#{path_to_dn(full_key_path)}"},
       @search_opts
-    ]
+    ].join(' ')
 
     value = nil
     err_msg = nil
     done = false
     retries = @retries
     until done
-      result = run_command(cmd.join(' '))
+      result = run_command(cmd)
       case result[:exitstatus]
       when 0
           match = result[:stdout].match(/^simpkvJsonValue: (.*?)$/)
@@ -354,18 +356,17 @@ plugin_class = Class.new do
       @cmd_env,
       @ldapsearch,
       @base_opts,
-# FIXME if @base_dn is configured, could have characters to be escaped?
-      '-b', path_to_dn(full_keydir_path, false),
+      '-b', %Q{"#{path_to_dn(full_keydir_path, false)}"},
       '-s', 'one',
       @search_opts
-    ]
+    ].join(' ')
 
     ldif_out = nil
     err_msg = nil
     done = false
     retries = @retries
     until done
-      result = run_command(cmd.join(' '))
+      result = run_command(cmd)
       case result[:exitstatus]
       when 0
         ldif_out = result[:stdout]
@@ -549,7 +550,7 @@ plugin_class = Class.new do
       @ldapadd,
       @base_opts,
       '-f', ldif_file.path
-    ]
+    ].join(' ')
 
     added = false
     exitstatus = nil
@@ -557,7 +558,7 @@ plugin_class = Class.new do
     done = false
     retries = @retries
     until done
-      result = run_command(cmd.join(' '))
+      result = run_command(cmd)
       case result[:exitstatus]
       when 0
         added = true
@@ -598,7 +599,7 @@ plugin_class = Class.new do
       @ldapmodify,
       @base_opts,
       '-f', ldif_file.path
-    ]
+    ].join(' ')
 
     modified = false
     exitstatus = nil
@@ -606,7 +607,7 @@ plugin_class = Class.new do
     done = false
     retries = @retries
     until done
-      result = run_command(cmd.join(' '))
+      result = run_command(cmd)
       case result[:exitstatus]
       when 0
         modified = true
@@ -697,6 +698,7 @@ plugin_class = Class.new do
     end
 
     if config.key?('base_dn')
+      # FIXME fix characters that should be escaped or detect and reject?
       @base_dn = config['base_dn']
     else
       @base_dn = 'ou=simpkv,o=puppet,dc=simp'
@@ -747,16 +749,16 @@ plugin_class = Class.new do
 
       if ldap_uri.match(/^ldap:/)
         # StartTLS
-        @base_opts = "-ZZ -x -D #{admin_dn} -y #{admin_pw_file} -H #{ldap_uri}"
+        @base_opts = %Q{-ZZ -x -D "#{admin_dn}" -y #{admin_pw_file} -H #{ldap_uri}}
       else
         # TLS
-        @base_opts = "-x -D #{admin_dn} -y #{admin_pw_file} -H #{ldap_uri}"
+        @base_opts = %Q{-x -D "#{admin_dn}" -y #{admin_pw_file} -H #{ldap_uri}}
       end
 
     else
       # unencrypted ldap or ldapi
       @cmd_env = ''
-      @base_opts = "-x -D #{admin_dn} -y #{admin_pw_file} -H #{ldap_uri}"
+      @base_opts = %Q{-x -D "#{admin_dn}" -y #{admin_pw_file} -H #{ldap_uri}}
     end
 
     if config.key?('retries')
