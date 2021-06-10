@@ -1,5 +1,4 @@
 def validate_ldap_entry(path, type, puppet_env, operation, config, host)
-begin
   result = false
   #FIXME missing environments or globals
   instance_path = File.join('instances', config['id'])
@@ -15,14 +14,10 @@ begin
     cmd = build_ldapsearch_cmd(dn, config)
     result = on(host, cmd, :accept_all_exit_codes => true)
     match = result.stdout.match(%r{^dn: .*#{dn}})
-    result = (operation == :present) ? !match.nil? : match.nil
+    result = (operation == :present) ? !match.nil? : match.nil?
   end
 
   result
-rescue Exception => e
-require 'pry'
-binding.pry
-end
 end
 
 def build_folder_dn(folder, config)

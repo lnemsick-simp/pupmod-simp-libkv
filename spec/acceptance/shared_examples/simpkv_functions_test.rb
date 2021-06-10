@@ -7,11 +7,18 @@
 #   verify their operation independent of the backend type used.
 #   - The simpkv_test module exclusively uses simpkv functions for store/retrieve
 #     operations.
-#   - Use of simpkv functions provides a self-consistency check.
-# - Uses backend-specific validator function to independently verify the keys
+#   - Use of simpkv functions provides a self-consistency check, but is
+#     insufficient.
+# - Uses backend-specific validator function to independently verify keys
 #   and folders are present/absent in the backend.
 #   - Necessary to ensure store/retrieve operations are going where we think
 #     they are going!
+#   - TODO Only a subset of data is checked at this time.
+# - Sorry, this is a very long test file, because each step builds on previous
+#   steps.
+#   - Keys have to be added before they can be checked/retrieved/deleted.
+#   - Validation of these additions and removals assumes a specific
+#     order of backend operations.
 #
 # @param host Host object
 #
@@ -107,7 +114,9 @@ shared_examples 'simpkv functions test' do |host|
     # * Stores values of different types.  Binary content is handled
     #   via a separate test.
     # * One of the calls to the Puppet-language function will go to the
-    #   default backend.
+    #   'default' backend instance.
+    # * All the rest of the store operations will go to the 'class_keys'
+    #   backend instance.
     class { 'simpkv_test::put': }
 
     # These two defines call simpkv::put directly and via the Puppet-language
@@ -127,7 +136,7 @@ shared_examples 'simpkv functions test' do |host|
     end
 
     # The validation of the existence and content of the keys we just stored
-    # will be done in subsequent tests using simpkv::exists and simpkv::get.
+    # will be done in subsequent tests using simpkv::exists() and simpkv::get().
     # However, those tests are not plugin-specific and won't find issues in
     # which we think we are storing the keys using one type of plugin, but
     # instead are using another plugin (e.g., the default file plugin). So,
@@ -231,9 +240,13 @@ shared_examples 'simpkv functions test' do |host|
   context 'simpkv exists operation' do
     let(:manifest) {
       <<-EOS
-      # class uses simpkv::exists to verify the existence of keys in
-      # the 'class_keys' backend; fails compilation if any simpkv::exists
-      # result doesn't match expected
+      # class uses simpkv::exists to verify
+      # - The existence of all keys in the 'class_keys' and 'default' backends
+      # - A key in the 'default' backend can't be retrieved using the app_id
+      #   mapped to the 'class_keys' backend.
+      #
+      # Fails compilation if any simpkv::exists result doesn't match
+      # expected
       class { 'simpkv_test::exists': }
       EOS
     }
@@ -245,10 +258,11 @@ shared_examples 'simpkv functions test' do |host|
 
   context 'simpkv get operation' do
     let(:manifest) {
+      # TODO update simpkv_test::get to verify keys from all backends
       <<-EOS
       # class uses simpkv::get to retrieve values with/without metadata for
-      # keys in the 'class_keys' backend; fails compilation if any
-      # retrieved info does match expected
+      # keys in the 'class_keys' backend; fails compilation if any retrieved
+      # info does not match expected
       class { 'simpkv_test::get': }
       EOS
     }
@@ -261,6 +275,7 @@ shared_examples 'simpkv functions test' do |host|
 
   context 'simpkv list operation' do
     let(:manifest) {
+      # TODO update simpkv_test::list to verify key lists from all backends
       <<-EOS
       # class uses simpkv::list to retrieve list of keys/values/metadata tuples
       # for keys in the 'class_keys' backend; fails compilation if the
@@ -279,9 +294,9 @@ shared_examples 'simpkv functions test' do |host|
     let(:manifest) {
       <<-EOS
       # class uses simpkv::delete to remove a subset of keys in the 'class_keys'
-      # backend and the simpkv::exists to verify they are gone but the other keys
-      # are still present; fails compilation if any removed keys still exist or
-      # any preserved keys have been removed
+      # backend and the simpkv::exists to verify they are gone and that the
+      # other keys are still present; fails compilation if any removed keys
+      # still exist or any preserved keys have been removed
       class { 'simpkv_test::delete': }
       EOS
     }
@@ -290,22 +305,24 @@ shared_examples 'simpkv functions test' do |host|
       apply_manifest_on(host, manifest, :catch_failures => true)
     end
 
-=begin
-# FIXME insertion point for validation of delete operation
+    # In the above test, we have already verified the keys we wanted to delete
+    # have been removed using simpkv::exists(). However, we just want to be sure
+    # using an independent, plugin-specific validator.
     [
-      '/var/simp/simpkv/file/class/production/from_class/boolean',
-      '/var/simp/simpkv/file/class/production/from_class/string',
-      '/var/simp/simpkv/file/class/production/from_class/integer',
-      '/var/simp/simpkv/file/class/production/from_class/float',
-      '/var/simp/simpkv/file/class/production/from_class/array_strings',
-      '/var/simp/simpkv/file/class/production/from_class/array_integers',
-      '/var/simp/simpkv/file/class/production/from_class/hash',
-    ].each do |file|
-      it "should remove #{file}" do
-        expect( file_exists_on(host, file) ).to be false
+      'from_class/boolean',
+      'from_class/string',
+      'from_class/integer',
+      'from_class/float',
+      'from_class/array_strings',
+      'from_class/array_integers',
+      'from_class/hash',
+    ].each do |key|
+      it "should remove '#{key}' production env key in 'class_keys' backend" do
+        result = options[:validator].call(key, :key, 'production', :absent,
+          backend_configs[:class_keys], host)
+        expect(result). to be true
       end
     end
-=end
   end
 
   context 'simpkv deletetree operation' do
@@ -322,12 +339,11 @@ shared_examples 'simpkv functions test' do |host|
       apply_manifest_on(host, manifest, :catch_failures => true)
     end
 
-=begin
-# FIXME insertion point for validation of deletetree operation
     it 'should remove specified folder' do
-      expect( file_exists_on(host, '/var/simp/simpkv/file/class/production/from_class/') ).to be false
+      result = options[:validator].call('from_class', :folder, 'production', :absent,
+        backend_configs[:class_keys], host)
+      expect(result). to be true
     end
-=end
   end
 
   context 'simpkv operations for binary data' do
