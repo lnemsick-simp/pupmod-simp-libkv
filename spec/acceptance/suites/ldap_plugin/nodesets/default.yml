@@ -6,16 +6,10 @@
   end
 -%>
 HOSTS:
-  el8-ldap:
+  el8:
     roles:
       - default
       - ldap_server
-    platform: el-8-x86_64
-    box: centos/8
-    hypervisor: <%= hypervisor %>
-
-  el8:
-    roles:
       - client
     platform: el-8-x86_64
     box: centos/8

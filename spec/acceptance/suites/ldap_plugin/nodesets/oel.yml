@@ -6,17 +6,10 @@
   end
 -%>
 HOSTS:
-  oel8-ldap:
+  oel8:
     roles:
       - default
       - ldap_server
-      - local_client
-    platform: el-8-x86_64
-    box: generic/oracle8
-    hypervisor: <%= hypervisor %>
-
-  oel8:
-    roles:
       - client
     platform: el-8-x86_64
     box: generic/oracle8
