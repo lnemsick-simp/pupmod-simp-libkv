@@ -31,7 +31,7 @@ describe 'ldap_plugin using ldapi' do
 
       it_behaves_like 'simpkv functions test', host
 
-      context "clean up on #{host} for next test" do
+      context "clear key store on #{host} for next test" do
         it 'should remove all ldap_plugin instance data to restore to an empty state' do
           cmd = [
             'ldapdelete',

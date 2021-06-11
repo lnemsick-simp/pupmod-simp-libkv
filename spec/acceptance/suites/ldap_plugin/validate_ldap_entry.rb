@@ -29,9 +29,23 @@ def build_folder_dn(folder, config)
 end
 
 def build_ldapsearch_cmd(dn, config)
-  [
+  env = []
+  auth_option = '-x'
+  if config['enable_tls']
+    env = [
+      "LDAPTLS_CERT=#{tls_cert}",
+      "LDAPTLS_KEY=#{tls_key}",
+      "LDAPTLS_CACERT=#{tls_cacert}"
+    ]
+    if config['ldap_uri'].start_with?('ldap://')
+      # StartTLS
+      auth_option = '-ZZ'
+    end
+  end
+
+  cmd = env + [
     'ldapsearch',
-    '-x',
+    auth_option,
     "-y #{config['admin_pw_file']}",
     "-D #{config['admin_dn']}",
     "-H #{config['ldap_uri']}",
@@ -40,5 +54,7 @@ def build_ldapsearch_cmd(dn, config)
     '-o "ldif_wrap=no"',
     '-LLL',
     '1.1'
-  ].join(' ')
+  ]
+
+  cmd.join(' ')
 end

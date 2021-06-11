@@ -50,7 +50,6 @@ shared_context 'ldap server configuration' do
 
   # PKI general
   let(:certdir) { '/etc/pki/simp-testing/pki' }
-  let(:tls_cacert) { "#{certdir}/cacerts/cacerts.pem" }
 
   # Method object to validate key/folder entries in an LDAP instance
   let(:validator) { method(:validate_ldap_entry) }
