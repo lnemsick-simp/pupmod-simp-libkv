@@ -348,6 +348,10 @@ shared_examples 'simpkv functions test' do |host|
 
   context 'simpkv operations for binary data' do
     context 'prep' do
+      it 'should have a clean start' do
+        on(host, 'rm -rf /root/binary_data')
+      end
+
       it 'should create a binary file for test' do
         on(host, 'mkdir /root/binary_data')
         on(host, 'dd count=1 if=/dev/urandom of=/root/binary_data/input_data')

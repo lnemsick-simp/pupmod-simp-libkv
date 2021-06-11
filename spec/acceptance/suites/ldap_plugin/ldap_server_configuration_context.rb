@@ -1,45 +1,58 @@
 # Common LDAP configuration needed to set up and access the LDAP
-# instance containing simpkv data
+# instances containing simpkv data.
+# - One instance will be TLS enabled and the other will not.
+#
 require_relative 'validate_ldap_entry'
 shared_context 'ldap server configuration' do
+
   # FIXME
-  # - This test configures the ldap_plugin to use the root dn and password,
-  #   instead of a specific bind user and password for the simpkv subtree.
-  #
-  let(:ldap_instance) { 'simp_data' }
+  # - This test configures the ldap_plugin to use the root dn and password
+  #   for each instance as its admin user, instead of a specific bind user
+  #   and password for the simpkv subtree within the instance.
   let(:base_dn) { 'dc=simp' }
   let(:root_dn) { 'cn=Directory_Manager'  }
-  let(:root_pw) { 'P@ssw0rdP@ssw0rd!' }
   let(:simpkv_base_dn) { "ou=simpkv,o=puppet,#{base_dn}"}
   let(:admin_dn) { root_dn }
-  let(:admin_pw) { root_pw }
-  # FIXME can't compile manifests unless this already exists on each host
-  let(:admin_pw_file) { '/etc/simp/simpkv_pw.txt' }
 
-  # intentionally pick non-standard port, as we expect port 389 to be
-  # used in the LDAP instance for user account info
-  let(:ldap_port) { 388 }
+  let(:ldap_instances) { {
+    'simp_data_without_tls' => {
+      # ds389::instance config
+      :base_dn        => base_dn,
+      :root_dn        => root_dn,
+      :root_pw        => 'P@ssw0rdP@ssw0rd!N0TLS',
+      :port           => 387,
 
-  let(:validator) { method(:validate_ldap_entry) }
+      # simpkv ldap_plugin config
+      :simpkv_base_dn => simpkv_base_dn,
+      :admin_dn       => admin_dn,
+      :admin_pw       => 'P@ssw0rdP@ssw0rd!N0TLS',
+      :admin_pw_file  => '/etc/simp/simp_data_without_tls_pw.txt'
+    },
 
-  context 'FIXME ensure password file exists prior to using simpkv functions' do
-    let(:manifest) { <<-EOM
-      file { '/etc/simp': ensure => 'directory' }
+    'simp_data_with_tls'    => {
+      # ds389::instance config
+      :base_dn        => base_dn,
+      :root_dn        => root_dn,
+      :root_pw        => 'P@ssw0rdP@ssw0rd!TLS',
+      :port           => 388,  # for StartTLS
+# FIXME put this back once ds389 module is fixed
+#      :secure_port    => 637,
+      :secure_port    => 636,
 
-      file { '#{admin_pw_file}':
-          ensure  => present,
-          owner   => 'root',
-          group   => 'root',
-          mode    => '0400',
-          content => Sensitive('#{admin_pw}')
-      }
-      EOM
+      # simpkv ldap_plugin config
+      :simpkv_base_dn => simpkv_base_dn,
+      :admin_dn       => admin_dn,
+      :admin_pw       => 'P@ssw0rdP@ssw0rd!TLS',
+      :admin_pw_file  => '/etc/simp/simp_data_with_tls_pw.txt'
     }
-    hosts.each do |host|
-      it 'should create admin pw file needed by ldap plugin' do
-        apply_manifest_on(host, manifest, :catch_failures => true)
-      end
-    end
-  end
+
+  } }
+
+  # PKI general
+  let(:certdir) { '/etc/pki/simp-testing/pki' }
+  let(:tls_cacert) { "#{certdir}/cacerts/cacerts.pem" }
+
+  # Method object to validate key/folder entries in an LDAP instance
+  let(:validator) { method(:validate_ldap_entry) }
 end
 
