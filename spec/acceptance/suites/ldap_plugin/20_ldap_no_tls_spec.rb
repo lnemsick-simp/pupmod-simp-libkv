@@ -1,41 +1,14 @@
-# frozen_string_literal: true
-
 =begin
 
 require 'spec_helper_acceptance'
+require_relative 'ldap_server_configuration_context'
 
-test_name 'ldap_plugin using ldapi'
+test_name 'ldap_plugin using ldap without TLS'
 
-describe 'ldap_plugin using ldapi' do
-  let(:ldap_instance) { 'simp_data' }
-  let(:base_dn) { 'dc=simp' }
-  let(:root_dn) { 'cn=Directory_Manager'  }
-  let(:root_pw) { 'P@ssw0rdP@ssw0rd!' }
-  let(:ldap_port) { 388 }
-  let(:bootstrap_ldif) { File.read(File.join(__dir__, 'files', 'bootstrap.ldif')) }
+describe 'ldap_plugin using ldap without TLS' do
 
-  hosts.each do |host|
-    context "host set up on #{host}" do
-      it 'has a proper FQDN' do
-        on(host, "hostname #{fact_on(host, 'fqdn')}")
-        on(host, 'hostname -f > /etc/hostname')
-      end
-
-#FIXME remove this when done debugging
-      it 'has vim installed' do
-        on(host, 'yum install -y vim')
-      end
-    end
-  end
-
-  # FIXMEs
-  # - This test configures the ldap_plugin to use the root dn and password,
-  #   instead of a specific bind user and password for the simpkv subtree.
-  # - This test does not yet use a SIMP profile to set up the simp_data LDAP
-  #   instance.
-  # - This test manually works around the lack of schema management in
-  #   simp/ds389 (SIMP-9676).
   hosts_with_role(hosts, 'ldap_server').each do |host|
+    let(:ldap_uri)
     context "LDAP server set up on #{host}" do
       let(:manifest) do
         'include ds389'

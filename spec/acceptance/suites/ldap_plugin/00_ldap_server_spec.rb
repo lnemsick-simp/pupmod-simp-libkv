@@ -46,6 +46,7 @@ describe 'ldap server setup' do
               'bootstrap_ldif_content' => bootstrap_ldif
             }
           }
+#FIXME add an instance with tls and configure schema in it
         }
       end
 

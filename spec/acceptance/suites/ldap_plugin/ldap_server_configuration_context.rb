@@ -21,5 +21,25 @@ shared_context 'ldap server configuration' do
   let(:ldap_port) { 388 }
 
   let(:validator) { method(:validate_ldap_entry) }
+
+  context 'FIXME ensure password file exists prior to using simpkv functions' do
+    let(:manifest) { <<-EOM
+      file { '/etc/simp': ensure => 'directory' }
+
+      file { '#{admin_pw_file}':
+          ensure  => present,
+          owner   => 'root',
+          group   => 'root',
+          mode    => '0400',
+          content => Sensitive('#{admin_pw}')
+      }
+      EOM
+    }
+    hosts.each do |host|
+      it 'should create admin pw file needed by ldap plugin' do
+        apply_manifest_on(host, manifest, :catch_failures => true)
+      end
+    end
+  end
 end
 
