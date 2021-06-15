@@ -86,34 +86,4 @@ describe 'ldap server setup' do
       end
     end
   end
-
-  # FIXME Can't compile manifests with simpkv functions unless the files containing
-  #       the admin passwords already exists on each host
-  context 'Ensure LDAP password files for clients exists prior to using simpkv functions' do
-    let(:manifest) { <<-EOM
-      file { '/etc/simp': ensure => 'directory' }
-
-      file { '#{ldap_instances['simp_data_without_tls'][:admin_pw_file]}':
-          ensure  => present,
-          owner   => 'root',
-          group   => 'root',
-          mode    => '0400',
-          content => Sensitive('#{ldap_instances['simp_data_without_tls'][:admin_pw]}')
-      }
-
-      file { '#{ldap_instances['simp_data_with_tls'][:admin_pw_file]}':
-          ensure  => present,
-          owner   => 'root',
-          group   => 'root',
-          mode    => '0400',
-          content => Sensitive('#{ldap_instances['simp_data_with_tls'][:admin_pw]}')
-      }
-      EOM
-    }
-    hosts.each do |host|
-      it 'should create admin pw file needed by ldap plugin' do
-        apply_manifest_on(host, manifest, :catch_failures => true)
-      end
-    end
-  end
 end

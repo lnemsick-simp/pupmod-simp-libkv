@@ -76,7 +76,12 @@ plugin_class = Class.new do
     # unnecessary ldap add operations over the lifetime of this plugin instance
     @existing_folders = Set.new
     @instance_path = File.join('instances', @name.gsub(%r{^ldap/},''))
-    @search_opts = '-o "ldif_wrap=no" -LLL'
+
+    # TODO switch to ldif_wrap when we drop support for EL7
+    # - EL7 only supports ldif-wrap
+    # - EL8 says it supports ldif_wrap (--help and man page), but actually
+    #   accepts ldif-wrap or ldif_wrap
+    @search_opts = '-o "ldif-wrap=no" -LLL'
 
     # backend config should already have been verified by simpkv adapter, but
     # just in case...
@@ -116,6 +121,7 @@ plugin_class = Class.new do
   #   * :err_msg - String. Explanatory text upon failure; nil otherwise.
   #
   def delete(key)
+    Puppet.debug("#{@name} delete(#{key})")
     full_key_path =  File.join(@instance_path, key)
 
 # ldapdelete -x -w "P@ssw0rdP@ssw0rd" -D "cn=Directory_Manager"   -H ldapi://%2fvar%2frun%2fslapd-simp_kv.socket   "simpkvKey=key1,ou=group1,ou=app2,ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp"
@@ -164,6 +170,7 @@ plugin_class = Class.new do
   #   * :err_msg - String. Explanatory text upon failure; nil otherwise.
   #
   def deletetree(keydir)
+    Puppet.debug("#{@name} deletetree(#{keydir})")
     full_keydir_path =  File.join(@instance_path, keydir)
 #ldapdelete -x -w "P@ssw0rdP@ssw0rd" -D "cn=Directory_Manager" -H ldapi://%2fvar%2frun%2fslapd-simp_kv.socket -r "ou=app3,ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp"
     cmd = [
@@ -219,6 +226,7 @@ plugin_class = Class.new do
   #     determined; nil otherwise.
   #
   def exists(key)
+    Puppet.debug("#{@name} exists(#{key})")
     dn = nil
     scope = nil
     search_filter = ''
@@ -284,6 +292,7 @@ plugin_class = Class.new do
   #   * :err_msg - String. Explanatory text upon failure; nil otherwise.
   #
   def get(key)
+    Puppet.debug("#{@name} get(#{key})")
     full_key_path =  File.join(@instance_path, key)
 
     # ldapsearch -x -w "P@ssw0rdP@ssw0rd" -D "cn=Directory_Manager" -H ldapi://%2fvar%2frun%2fslapd-simp_kv.socket -b "simpkvKey=key1,ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp" -o ldif_wrap=no -LLL
@@ -347,6 +356,7 @@ plugin_class = Class.new do
   #   * :err_msg - String. Explanatory text upon failure; nil otherwise.
   #
   def list(keydir)
+    Puppet.debug("#{@name} list(#{keydir})")
     full_keydir_path =  File.join(@instance_path, keydir)
 
 
@@ -408,6 +418,7 @@ plugin_class = Class.new do
   #   * :err_msg - String. Explanatory text upon failure; nil otherwise.
   #
   def put(key, value)
+    Puppet.debug("#{@name} put(#{key},...)")
     full_key_path =  File.join(@instance_path, key)
 
     # We want to add the key/value entry if it does not exist, but only modify
@@ -424,15 +435,19 @@ plugin_class = Class.new do
     if ldap_results[:success]
       # first try an add for the key/value entry
       ldif = entry_add_ldif(full_key_path, value)
+
+      Puppet.debug("#{@name} Attempting add for #{full_key_path}")
       ldap_results = ldap_add(ldif, false)
 
       if ldap_results[:success]
         results = { :result => true, :err_msg => nil }
       elsif (ldap_results[:exitstatus] == 68)  # Already exists
+        Puppet.debug("#{@name} #{full_key_path} already exists")
 # FIXME move to update_value()
         current_result = get(key)
         if current_result[:result]
           if current_result[:result] != value
+            Puppet.debug("#{@name} Attempting modify for #{full_key_path}")
             ldif = entry_modify_ldif(full_key_path, value)
             ldap_results = ldap_modify(ldif, false)
             if ldap_results[:success]
@@ -442,6 +457,7 @@ plugin_class = Class.new do
             end
           else
             # no change needed
+            Puppet.debug("#{@name} #{full_key_path} value already correct")
             results = { :result => true, :err_msg => nil }
           end
         else
@@ -462,7 +478,7 @@ plugin_class = Class.new do
   # command should not contain pipes, as they can cause inconsistent
   # results
   def run_command(command)
-    Puppet.debug( "Executing: #{command}" )
+    Puppet.debug( "#{@name} executing: #{command}" )
     out_pipe_r, out_pipe_w = IO.pipe
     err_pipe_r, err_pipe_w = IO.pipe
     pid = spawn(command, :out => out_pipe_w, :err => err_pipe_w)
@@ -475,6 +491,8 @@ plugin_class = Class.new do
     out_pipe_r.close
     stderr = err_pipe_r.read
     err_pipe_r.close
+
+    stderr = "#{command} failed:\n#{stderr}" if exitstatus != 0
 
     {
       :success    => (exitstatus == 0),
@@ -512,6 +530,7 @@ plugin_class = Class.new do
 
   # Ensure all folders in a folder path are present.
   def ensure_folder_path(folder_path)
+    Puppet.debug("#{@name} ensure_folder_path(#{folder_path})")
     # Handle each folder separately instead of all at once, so we don't have to
     # use log scraping to understand what happened...log scraping is fragile.
     ldif_file = nil
@@ -540,6 +559,7 @@ plugin_class = Class.new do
   end
 
   def ldap_add(ldif, ignore_already_exists = false)
+    Puppet.debug( "#{@name} add ldif:\n#{ldif}" )
     ldif_file = Tempfile.new('ldap_add')
     ldif_file.puts(ldif)
     ldif_file.close
@@ -590,6 +610,7 @@ plugin_class = Class.new do
   end
 
   def ldap_modify(ldif)
+    Puppet.debug( "#{@name} modify ldif:\n#{ldif}" )
     ldif_file = Tempfile.new('ldap_add')
     ldif_file.puts(ldif)
     ldif_file.close
@@ -830,7 +851,7 @@ plugin_class = Class.new do
 
     [ @ldapsearch, @ldapadd, @ldapmodify, @ldapdelete ].each do |cmd|
       if cmd.nil?
-        raise("Missing required #{cmd} command.  Ensure openldap-utils RPM is installed")
+        raise("Missing required #{cmd} command.  Ensure openldap-clients RPM is installed")
       end
     end
 

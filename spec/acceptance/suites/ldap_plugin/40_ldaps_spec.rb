@@ -16,6 +16,21 @@ describe 'ldap_plugin using ldap with TLS' do
       let(:tls_key)    { "#{certdir}/private/#{client_fqdn}.pem" }
       let(:tls_cacert) { "#{certdir}/cacerts/cacerts.pem" }
 
+      context "ensure empty key store on #{server}" do
+        it 'should remove all ldap_plugin instance data' do
+          cmd = [
+            'ldapdelete',
+            '-x',
+            %Q{-D "#{common_ldap_config['admin_dn']}"},
+            '-y', common_ldap_config['admin_pw_file'],
+            '-H', common_ldap_config['ldap_uri'],
+            '-r',
+            %Q{"ou=instances,#{common_ldap_config['base_dn']}"}
+          ].join(' ')
+          on(server, cmd, :accept_all_exit_codes => true)
+        end
+      end
+
       context "simpkv ldap_plugin on #{client} using ldap with TLS to #{server}" do
         let(:common_ldap_config) {{
           'ldap_uri'      => ldap_uri,

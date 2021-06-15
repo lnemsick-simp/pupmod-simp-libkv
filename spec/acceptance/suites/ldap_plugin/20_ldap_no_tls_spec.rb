@@ -11,6 +11,21 @@ describe 'ldap_plugin using ldap without TLS' do
     let(:ldap_uri) { "ldap://#{server_fqdn}:#{ldap_instances['simp_data_without_tls'][:port]}" }
 
     hosts_with_role(hosts, 'client').each do |client|
+      context "ensure empty key store on #{server}" do
+        it 'should remove all ldap_plugin instance data' do
+          cmd = [
+            'ldapdelete',
+            '-x',
+            %Q{-D "#{common_ldap_config['admin_dn']}"},
+            '-y', common_ldap_config['admin_pw_file'],
+            '-H', common_ldap_config['ldap_uri'],
+            '-r',
+            %Q{"ou=instances,#{common_ldap_config['base_dn']}"}
+          ].join(' ')
+          on(server, cmd, :accept_all_exit_codes => true)
+        end
+      end
+
       context "simpkv ldap_plugin on #{client} using ldap without TLS to #{server}" do
         let(:common_ldap_config) {{
           'ldap_uri'      => ldap_uri,

@@ -135,6 +135,10 @@ shared_examples 'simpkv functions test' do |host|
       apply_manifest_on(host, manifest, :catch_failures => true)
     end
 
+    it 'should work when keys already exist with same value' do
+      apply_manifest_on(host, manifest, :catch_failures => true)
+    end
+
     # The validation of the existence and content of the keys we just stored
     # will be done in subsequent tests using simpkv::exists() and simpkv::get().
     # However, those tests are not plugin-specific and won't find issues in

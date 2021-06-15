@@ -51,7 +51,12 @@ def build_ldapsearch_cmd(dn, config)
     "-H #{config['ldap_uri']}",
     '-s base',
     "-b #{dn}",
-    '-o "ldif_wrap=no"',
+
+    # TODO switch to ldif_wrap when we drop support for EL7
+    # - EL7 only supports ldif-wrap
+    # - EL8 says it supports ldif_wrap (--help and man page), but actually
+    #   accepts ldif-wrap or ldif_wrap
+    '-o "ldif-wrap=no"',
     '-LLL',
     '1.1'
   ]

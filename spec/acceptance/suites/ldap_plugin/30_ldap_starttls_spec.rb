@@ -16,6 +16,21 @@ describe 'ldap_plugin using ldap with StartTLS' do
       let(:tls_key)    { "#{certdir}/private/#{client_fqdn}.pem" }
       let(:tls_cacert) { "#{certdir}/cacerts/cacerts.pem" }
 
+      context "ensure empty key store on #{server}" do
+        it 'should remove all ldap_plugin instance data' do
+          cmd = [
+            'ldapdelete',
+            '-x',
+            %Q{-D "#{common_ldap_config['admin_dn']}"},
+            '-y', common_ldap_config['admin_pw_file'],
+            '-H', common_ldap_config['ldap_uri'],
+            '-r',
+            %Q{"ou=instances,#{common_ldap_config['base_dn']}"}
+          ].join(' ')
+          on(server, cmd, :accept_all_exit_codes => true)
+        end
+      end
+
       context "simpkv ldap_plugin on #{client} using ldap with StartTLS to #{server}" do
         let(:common_ldap_config) {{
           'ldap_uri'      => ldap_uri,
@@ -40,24 +55,6 @@ describe 'ldap_plugin using ldap with StartTLS' do
         }}
 
         it_behaves_like 'simpkv functions test', client
-
-        context "clear key store on #{server} for next test" do
-          it 'should remove all ldap_plugin instance data to restore to an empty state' do
-            cmd = [
-              "LDAPTLS_CERT=#{tls_cert}",
-              "LDAPTLS_KEY=#{tls_key}",
-              "LDAPTLS_CACERT=#{tls_cacert}",
-              'ldapdelete',
-              '-ZZ',
-              %Q{-D "#{common_ldap_config['admin_dn']}"},
-              '-y', common_ldap_config['admin_pw_file'],
-              '-H', common_ldap_config['ldap_uri'],
-              '-r',
-              %Q{"ou=instances,#{common_ldap_config['base_dn']}"}
-            ].join(' ')
-            on(server, cmd)
-          end
-        end
       end
     end
   end
