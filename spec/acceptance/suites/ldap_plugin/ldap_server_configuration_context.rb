@@ -26,7 +26,10 @@ shared_context 'ldap server configuration' do
       :simpkv_base_dn => simpkv_base_dn,
       :admin_dn       => admin_dn,
       :admin_pw       => 'P@ssw0rdP@ssw0rd!N0TLS',
-      :admin_pw_file  => '/etc/simp/simp_data_without_tls_pw.txt'
+      :admin_pw_file  => '/etc/simp/simp_data_without_tls_pw.txt',
+
+      # ldapi URI for ldapi tests and for clearing out data during test prep
+      :ldapi_uri      => 'ldapi://%2fvar%2frun%2fslapd-simp_data_without_tls.socket'
     },
 
     'simp_data_with_tls'    => {
@@ -43,7 +46,10 @@ shared_context 'ldap server configuration' do
       :simpkv_base_dn => simpkv_base_dn,
       :admin_dn       => admin_dn,
       :admin_pw       => 'P@ssw0rdP@ssw0rd!TLS',
-      :admin_pw_file  => '/etc/simp/simp_data_with_tls_pw.txt'
+      :admin_pw_file  => '/etc/simp/simp_data_with_tls_pw.txt',
+
+      # ldapi URI for ldapi tests and for clearing out data during test prep
+      :ldapi_uri      => 'ldapi://%2fvar%2frun%2fslapd-simp_data_with_tls.socket'
     }
 
   } }

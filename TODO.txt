@@ -1,0 +1,77 @@
+PROBLEM
+- have a problem: if password file does not exist prior to manifest
+  compilation, code will not compile
+  - functions called first in compilation so cannot make file pre-requisite
+  - put in /var/lib/simp/simpkv/ldap/instance_.txt
+  - flock file write so only one modification at a time -
+    don't want more than 1 write to the same file at a time.
+    - File will be on the compile host so could have
+      simultaneous access
+   - object_id <-- use for filename?
+   - if use temporary file, will not know when to remove
+   - can't echo password and pipe into ldap command. Still prompts for password.
+TODO
+- Get rid of Puppet 5 discussion and test modifications
+  WRT Binary type.
+- Replace Consul with LDAP in all examples
+- Make sure API change (get rid of self.type) is documented.
+- Get rid of unnecessary top scope `$::` in test manifest
+- Separate PR for self.type bug fix
+- Separate PR for test generalization for use
+  in multiple backends
+- Figure out how to do ldapi without a password and
+  incorporate in tests?
+- Make sure global keys are tested in test manifests
+- simpkv adapter print out limited backtrace if exception raised by plugin
+  - separate PR?
+- move clearing of database to its own shared example or shared context that
+  expects ldap_instance and accepts ldapserver host as arg
+  - move to shared_eample 'simpkv functions test'?  If get that smaller
+    will be manageable
+- generate the test manifests or hieradata for it?
+  - need easy way to have validator...right now hardcoded
+
+unit test
+- base DN configured with escaped characters
+acceptance tests
+- break upt simpkv_function_tests
+  - break out store operations
+    simpkv::put into its own shared_example with full validation
+  - break out retrieve operations
+  - break out delete operations
+  - restore store to appropriate state before each retrieve and delete
+    operations
+  - have full validation in store operations
+    verify_presence
+    verify_content
+- Need to test simpkv::put ops that update values
+- need to make sure LDAP modify timestamp is not overwritten
+  when value is NOT changed.
+- combination of file plugin and ldap plugin
+  - client node testing
+  - Needed to verify more than one plugin can operate
+    at once.
+
+
+
+LDAP command examples
+Add entry:
+  ldapadd -x -w "P@ssw0rdP@ssw0rd" -D "cn=Directory_Manager" -H ldapi://%2fvar%2frun%2fslapd-simp_kv.socket -f /root/simp_kv/ldifs/app2_group1_key1.ldif
+
+Remove entry:
+  ldapdelete -x -w "P@ssw0rdP@ssw0rd" -D "cn=Directory_Manager"   -H ldapi://%2fvar%2frun%2fslapd-simp_kv.socket   "simpkvKey=key1,ou=group1,ou=app2,ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp"
+
+Remove tree:
+  ldapdelete -x -w "P@ssw0rdP@ssw0rd" -D "cn=Directory_Manager" -H ldapi://%2fvar%2frun%2fslapd-simp_kv.socket -r "ou=app3,ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp"
+
+Check for existence:
+  ldapsearch -x -w "P@ssw0rdP@ssw0rd" -D "cn=Directory_Manager" -H ldapi://%2fvar%2frun%2fslapd-simp_kv.socket -b "ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp" -s one -o ldif_wrap=no "(|(ou=app1)(simpkvKey=app1))" -LLL 1.1
+
+Retrieve content:
+  ldapsearch -x -w "P@ssw0rdP@ssw0rd" -D "cn=Directory_Manager" -H ldapi://%2fvar%2frun%2fslapd-simp_kv.socket -b "simpkvKey=key1,ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp" -o ldif_wrap=no -LLL
+
+List:
+  ldapsearch -x -w "P@ssw0rdP@ssw0rd" -D "cn=Directory_Manager" -H ldapi://%2fvar%2frun%2fslapd-simp_kv.socket -b "ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp" -o ldif_wrap=no -LLL -s one
+
+
+

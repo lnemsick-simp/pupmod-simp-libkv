@@ -1,3 +1,5 @@
+#def validate_ldap_entry(path, host, backend_config, options =
+# {:type => :key, :operation => :present, :puppet_env => 'production', :value => nil})
 def validate_ldap_entry(path, type, puppet_env, operation, config, host)
   result = false
   #FIXME missing environments or globals

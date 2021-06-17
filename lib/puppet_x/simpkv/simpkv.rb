@@ -114,7 +114,8 @@ simp_simpkv_adapter_class = Class.new do
       begin
         result = instance.delete( normalize_key(key, options) )
       rescue Exception => e
-        err_msg = "simpkv #{instance.name} Error: #{e.message}"
+        bt = filtered_backtrace(e.backtrace)
+        err_msg = "simpkv #{instance.name} Error: #{e.message}\n#{bt.join("\n")}"
         result = { :result => false, :err_msg => err_msg }
       end
     end
@@ -145,7 +146,8 @@ simp_simpkv_adapter_class = Class.new do
       begin
         result = instance.deletetree( normalize_key(keydir, options) )
       rescue Exception => e
-        err_msg = "simpkv #{instance.name} Error: #{e.message}"
+        bt = filtered_backtrace(e.backtrace)
+        err_msg = "simpkv #{instance.name} Error: #{e.message}\n#{bt.join("\n")}"
         result = { :result => false, :err_msg => err_msg }
       end
     end
@@ -177,7 +179,8 @@ simp_simpkv_adapter_class = Class.new do
       begin
         result = instance.exists( normalize_key(key, options) )
       rescue Exception => e
-        err_msg = "simpkv #{instance.name} Error: #{e.message}"
+        bt = filtered_backtrace(e.backtrace)
+        err_msg = "simpkv #{instance.name} Error: #{e.message}\n#{bt.join("\n")}"
         result = { :result => nil, :err_msg => err_msg }
       end
     end
@@ -216,7 +219,8 @@ simp_simpkv_adapter_class = Class.new do
           result = raw_result
         end
       rescue Exception => e
-        err_msg = "simpkv #{instance.name} Error: #{e.message}"
+        bt = filtered_backtrace(e.backtrace)
+        err_msg = "simpkv #{instance.name} Error: #{e.message}\n#{bt.join("\n")}"
         result = { :result => nil, :err_msg => err_msg }
       end
     end
@@ -275,7 +279,8 @@ simp_simpkv_adapter_class = Class.new do
           result = raw_result
         end
       rescue Exception => e
-        err_msg = "simpkv #{instance.name} Error: #{e.message}"
+        bt = filtered_backtrace(e.backtrace)
+        err_msg = "simpkv #{instance.name} Error: #{e.message}\n#{bt.join("\n")}"
         result = { :result => nil, :err_msg => err_msg }
       end
     end
@@ -307,7 +312,8 @@ simp_simpkv_adapter_class = Class.new do
         normalized_value = serialize(value, metadata)
         result = instance.put(normalized_key, normalized_value)
       rescue Exception => e
-        err_msg = "simpkv #{instance.name} Error: #{e.message}"
+        bt = filtered_backtrace(e.backtrace)
+        err_msg = "simpkv #{instance.name} Error: #{e.message}\n#{bt.join("\n")}"
         result = { :result => false, :err_msg => err_msg }
       end
     end
@@ -316,6 +322,23 @@ simp_simpkv_adapter_class = Class.new do
   end
 
   ###### Internal methods ######
+
+  # @return Skinnied down exception backtrace for more useful reporting of
+  #   errors. This is especially helpful when debugging plugin code!
+  #
+  # @param backtrace Full exception backtrace
+  #
+  def filtered_backtrace(backtrace)
+    # Only go up to last line with a simpkv function file path. This removes
+    # all the useless, subsequent lines for the Puppet library internals.
+    # The user will still know the manifest that couldn't be compiled,
+    # because the compiler automatically adds a log line that reports the
+    # manifest file and line number that failed compilation.
+    short_bt = backtrace.reverse.drop_while { |line|
+      !line.include?('/simpkv/lib/puppet/functions/simpkv/')
+    }
+    short_bt.reverse
+  end
 
   # Adjust the key with the environment specified in the options Hash
   #

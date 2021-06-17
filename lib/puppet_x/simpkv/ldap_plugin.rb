@@ -124,8 +124,6 @@ plugin_class = Class.new do
     Puppet.debug("#{@name} delete(#{key})")
     full_key_path =  File.join(@instance_path, key)
 
-# ldapdelete -x -w "P@ssw0rdP@ssw0rd" -D "cn=Directory_Manager"   -H ldapi://%2fvar%2frun%2fslapd-simp_kv.socket   "simpkvKey=key1,ou=group1,ou=app2,ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp"
-#
     cmd = [
       @cmd_env,
       @ldapdelete,
@@ -172,7 +170,7 @@ plugin_class = Class.new do
   def deletetree(keydir)
     Puppet.debug("#{@name} deletetree(#{keydir})")
     full_keydir_path =  File.join(@instance_path, keydir)
-#ldapdelete -x -w "P@ssw0rdP@ssw0rd" -D "cn=Directory_Manager" -H ldapi://%2fvar%2frun%2fslapd-simp_kv.socket -r "ou=app3,ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp"
+
     cmd = [
       @cmd_env,
       @ldapdelete,
@@ -243,7 +241,6 @@ plugin_class = Class.new do
       scope = '-s one'
     end
 
-    # ldapsearch -x -w "P@ssw0rdP@ssw0rd" -D "cn=Directory_Manager" -H ldapi://%2fvar%2frun%2fslapd-simp_kv.socket -b "ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp" -s one -o ldif_wrap=no "(|(ou=app1)(simpkvKey=app1))" -LLL 1.1
     cmd = [
       @cmd_env,
       @ldapsearch,
@@ -295,7 +292,6 @@ plugin_class = Class.new do
     Puppet.debug("#{@name} get(#{key})")
     full_key_path =  File.join(@instance_path, key)
 
-    # ldapsearch -x -w "P@ssw0rdP@ssw0rd" -D "cn=Directory_Manager" -H ldapi://%2fvar%2frun%2fslapd-simp_kv.socket -b "simpkvKey=key1,ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp" -o ldif_wrap=no -LLL
     cmd = [
       @cmd_env,
       @ldapsearch,
@@ -358,9 +354,6 @@ plugin_class = Class.new do
   def list(keydir)
     Puppet.debug("#{@name} list(#{keydir})")
     full_keydir_path =  File.join(@instance_path, keydir)
-
-
-#ldapsearch -x -w "P@ssw0rdP@ssw0rd" -D "cn=Directory_Manager" -H ldapi://%2fvar%2frun%2fslapd-simp_kv.socket -b "ou=production,ou=environments,ou=default,ou=simpkv,o=puppet,dc=simp" -o ldif_wrap=no -LLL -s one
 
     cmd = [
       @cmd_env,
@@ -475,8 +468,14 @@ plugin_class = Class.new do
   end
 
   ###### Internal Methods ######
-  # command should not contain pipes, as they can cause inconsistent
-  # results
+  # Execute a command
+  #
+  # - Command should not contain pipes, as they can cause inconsistent
+  #   results
+  # - This method does not wrap the execution with a Timeout block, because
+  #   the commands being executed by this plugin (ldapsearch, ldapadd, etc)
+  #   have built-in timeout mechanisms.
+  #
   def run_command(command)
     Puppet.debug( "#{@name} executing: #{command}" )
     out_pipe_r, out_pipe_w = IO.pipe
@@ -559,12 +558,14 @@ plugin_class = Class.new do
   end
 
   def ldap_add(ldif, ignore_already_exists = false)
-    Puppet.debug( "#{@name} add ldif:\n#{ldif}" )
+    # Maintainers:  Comment out this line to see actual LDIF content when
+    # debugging. Since may contain sensitive info, we don't want to allow this
+    # output normally.
+    #Puppet.debug( "#{@name} add ldif:\n#{ldif}" )
     ldif_file = Tempfile.new('ldap_add')
     ldif_file.puts(ldif)
     ldif_file.close
 
-    # ldapadd -x -w "P@ssw0rdP@ssw0rd" -D "cn=Directory_Manager" -H ldapi://%2fvar%2frun%2fslapd-simp_kv.socket -f /root/simp_kv/ldifs/app2_group1_key1.ldif
     cmd = [
       @cmd_env,
       @ldapadd,
@@ -610,7 +611,10 @@ plugin_class = Class.new do
   end
 
   def ldap_modify(ldif)
-    Puppet.debug( "#{@name} modify ldif:\n#{ldif}" )
+    # Maintainers:  Comment out this line to see actual LDIF content when
+    # debugging. Since may contain sensitive info, we don't want to allow this
+    # output normally.
+    #Puppet.debug( "#{@name} modify ldif:\n#{ldif}" )
     ldif_file = Tempfile.new('ldap_add')
     ldif_file.puts(ldif)
     ldif_file.close
@@ -719,7 +723,7 @@ plugin_class = Class.new do
     end
 
     if config.key?('base_dn')
-      # FIXME fix characters that should be escaped or detect and reject?
+      # FIXME Fix characters that should be escaped or detect and reject?
       @base_dn = config['base_dn']
     else
       @base_dn = 'ou=simpkv,o=puppet,dc=simp'
@@ -730,7 +734,7 @@ plugin_class = Class.new do
     if config.key?('admin_dn')
       admin_dn = config['admin_dn']
     else
-      #FIXME should not use admin for whole tree
+      #FIXME Should not use admin for whole tree
       admin_dn = 'cn=Directory_Manager'
       Puppet.debug("simpkv plugin #{name}: Using simpkv admin DN #{admin_dn}")
     end

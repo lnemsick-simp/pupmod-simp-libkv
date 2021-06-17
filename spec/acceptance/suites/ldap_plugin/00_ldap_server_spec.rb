@@ -16,7 +16,7 @@ describe 'ldap server setup' do
         on(host, 'hostname -f > /etc/hostname')
       end
 
-#FIXME remove this when done debugging
+#FIXME remove prior to review
       it 'has vim installed' do
         on(host, 'yum install -y vim')
       end

@@ -372,6 +372,8 @@ shared_examples 'simpkv functions test' do |host|
       }
 
       it 'manifest should work with no errors' do
+#FIXME remove the debug
+        apply_manifest_on(host, manifest, {:catch_failures => true, :debug => true})
         apply_manifest_on(host, manifest, :catch_failures => true)
       end
 
