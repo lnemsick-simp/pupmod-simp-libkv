@@ -52,8 +52,7 @@ describe 'ldap server setup' do
               'root_dn_password'       => ldap_instances['simp_data_with_tls'][:root_pw],
               'listen_address'         => '0.0.0.0',
               'port'                   => ldap_instances['simp_data_with_tls'][:port],
-# FIXME put this back once ds389 module is fixed
-#              'secure_port'            => ldap_instances['simp_data_with_tls'][:secure_port],
+              'secure_port'            => ldap_instances['simp_data_with_tls'][:secure_port],
               'bootstrap_ldif_content' => bootstrap_ldif,
               'enable_tls'             => true,
               'tls_params'             => {

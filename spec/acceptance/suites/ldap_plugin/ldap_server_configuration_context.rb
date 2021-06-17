@@ -39,8 +39,8 @@ shared_context 'ldap server configuration' do
       :root_pw        => 'P@ssw0rdP@ssw0rd!TLS',
       :port           => 388,  # for StartTLS
 # FIXME put this back once ds389 module is fixed
-#      :secure_port    => 637,
-      :secure_port    => 636,
+      :secure_port    => 637,
+#      :secure_port    => 636,
 
       # simpkv ldap_plugin config
       :simpkv_base_dn => simpkv_base_dn,

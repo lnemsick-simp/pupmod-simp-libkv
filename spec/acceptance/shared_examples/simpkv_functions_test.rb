@@ -7,8 +7,11 @@
 #   verify their operation independent of the backend type used.
 #   - The simpkv_test module exclusively uses simpkv functions for store/retrieve
 #     operations.
+#   - The verification provided by the simpkv_test module includes value and
+#     metadata verification.
 #   - Use of simpkv functions provides a self-consistency check, but is
 #     insufficient.
+#     - This is why you must provide the backend-specific validator.
 # - Uses backend-specific validator function to independently verify keys
 #   and folders are present/absent in the backend.
 #   - Necessary to ensure store/retrieve operations are going where we think
@@ -22,7 +25,10 @@
 #
 # @param host Host object
 #
-# Assumed available context:
+# ASSUMPTIONS:
+# - The backends are empty, i.e., have no keys stored in them prior to exercising
+#   the examples in this test.
+# - The following are available within the context:
 #   options = Test options hash
 #   {
 #     :backend_configs => {
@@ -38,7 +44,7 @@
 #                    backend state>
 #   }
 #
-#   Validator method will return a Boolean and will be called with the following
+# - Validator method will return a Boolean and will be called with the following
 #   arguments:
 #   - path to check
 #   - path type (:key, :folder)
@@ -69,11 +75,13 @@ shared_examples 'simpkv functions test' do |host|
     #   backend.
     # - When app_id is absent, simpkv selects the 'default' backend.
     #
-    # In these tests, the manifests specify app_ids based on the type of
-    # resource in which the entry was created. (The app_ids look like catalog
-    # resource strings). This is totally **artificial** naming and grouping!
-    # However, it demonstrates backend selection and exercises the simpkv::*
-    # functions in Classes, Defines, and Puppet-language functions.
+    # In these tests, the manifests use app_ids that correspond to the type of
+    # resource in which the entry was created. For example, the `simpkv_test::put`
+    # class uses an app_id of 'Class[Simpkv_test::Put]' for keys stored using
+    # simpkv::put() with an app_id option.
+    #
+    #   >>>> This is totally artificial naming and grouping for testing! <<<<<
+    #
     #############################################################################
 
     # Backend definitions which will be mapped to app_id in simpkv::options
