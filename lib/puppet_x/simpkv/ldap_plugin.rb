@@ -442,7 +442,7 @@ plugin_class = Class.new do
           if current_result[:result] != value
             Puppet.debug("#{@name} Attempting modify for #{full_key_path}")
             ldif = entry_modify_ldif(full_key_path, value)
-            ldap_results = ldap_modify(ldif, false)
+            ldap_results = ldap_modify(ldif)
             if ldap_results[:success]
               results = { :result => true, :err_msg => nil }
             else
