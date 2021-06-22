@@ -15,35 +15,34 @@ TODO
   WRT Binary type.
 - Replace Consul with LDAP in all examples
 - Make sure API change (get rid of self.type) is documented.
-- Get rid of unnecessary top scope `$::` in test manifest
 - Separate PR for self.type bug fix
 - Separate PR for test generalization for use
   in multiple backends
+  - Make sure global keys are fully tested in test manifests
+  - generate the test manifests or hieradata for it?
+    - need easy way to have validator...right now hardcoded
+  - break upt simpkv_function_tests
+    - break out store operations
+      simpkv::put into its own shared_example with full validation
+    - break out retrieve operations
+    - break out delete operations
+    - restore store to appropriate state before each retrieve and delete
+      operations
+    - have full validation in store operations
+      verify_presence
+      verify_content
+   - verify repeated update same value, different value operations work.
+   - verify repeate delete and deletetree works
 - Figure out how to do ldapi without a password and
   incorporate in tests?
-- Make sure global keys are tested in test manifests
-- simpkv adapter print out limited backtrace if exception raised by plugin
-  - separate PR?
 - move clearing of database to its own shared example or shared context that
   expects ldap_instance and accepts ldapserver host as arg
   - move to shared_eample 'simpkv functions test'?  If get that smaller
     will be manageable
-- generate the test manifests or hieradata for it?
-  - need easy way to have validator...right now hardcoded
 
 unit test
 - base DN configured with escaped characters
 acceptance tests
-- break upt simpkv_function_tests
-  - break out store operations
-    simpkv::put into its own shared_example with full validation
-  - break out retrieve operations
-  - break out delete operations
-  - restore store to appropriate state before each retrieve and delete
-    operations
-  - have full validation in store operations
-    verify_presence
-    verify_content
 - Need to test simpkv::put ops that update values
 - need to make sure LDAP modify timestamp is not overwritten
   when value is NOT changed.
