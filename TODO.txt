@@ -33,6 +33,7 @@ TODO
       verify_content
    - verify repeated update same value, different value operations work.
    - verify repeate delete and deletetree works
+   - move defines into put class
 - Figure out how to do ldapi without a password and
   incorporate in tests?
 - move clearing of database to its own shared example or shared context that
