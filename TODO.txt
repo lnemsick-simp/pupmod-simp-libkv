@@ -1,3 +1,4 @@
+TEST NEEDS TO BE FIXED BECAUSE APP_ID CHANGED IN MERGED CODE?
 PROBLEM
 - have a problem: if password file does not exist prior to manifest
   compilation, code will not compile
