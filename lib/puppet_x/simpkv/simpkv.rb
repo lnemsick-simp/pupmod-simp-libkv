@@ -18,12 +18,16 @@ simp_simpkv_adapter_class = Class.new do
   require 'json'
   require 'pathname'
 
-  attr_accessor :plugin_classes, :plugin_instances
+  attr_accessor :plugin_info, :plugin_instances
 
   def initialize
     Puppet.debug('Constructing simpkv adapter from anonymous class')
-    @plugin_classes   = {} # backend plugin classes;
-                           # key = backend type returned by <plugin Class>.type
+    @plugin_info   = {}    # backend plugin classes;
+                           # key = backend type derived from the plugin base
+                           #       filename (<plugin type>_plugin.rb)
+                           # value = { :class  => <loaded class obj>,
+                           #           :source => <plugin file path>
+                           #         }
     @plugin_instances = {} # backend plugin instances;
                            # key = name assigned to the instance, <type>/<id>
                            # supports multiple backend plugin instances per backend
@@ -32,26 +36,23 @@ simp_simpkv_adapter_class = Class.new do
     #
     # - Every file in modules/*/lib/puppet_x/simpkv/*_plugin.rb is assumed
     #   to contain a simpkv backend plugin.
+    # - A field in the base filename of the plugin defines the plugin type,
+    #   <plugin type>_.plugin.rb, and only the first plugin found for a
+    #   type will be loaded.
     # - Each plugin file must contain an anonymous class that can be accessed
     #   by a 'plugin_class' local variable.
-    # - Each plugin must provide the following methods, which are described
-    #   in detail in plugin_template.rb:
-    #   - Class methods:
-    #     - type: Class method that returns the backend type
-    #   - Instance methods:
-    #     - initialize: constructor
-    #     - name: return unique identifier assigned to the plugin instance
-    #     - delete: delete key from the backend
-    #     - deletetree: delete a folder from the backend
-    #     - exists: check for existence of key in the backend
-    #     - get: retrieve the value of a key in the backend
-    #     - list: list the key/value pairs and sub-folders available in a
-    #       folder in the backend
-    #     - put: insert a key/value pair into the backend
-    #
-    # NOTE: All backend plugins must return a unique value for .type().
-    #       Otherwise, only the Class object for last plugin with the same
-    #       type will be stored in the plugin_classes Hash.
+    # - Each plugin must provide the following instance methods, which are
+    #   described in detail in plugin_template.rb:
+    #   - initialize: constructor
+    #   - configure: Configure the plugin instance
+    #   - name: return unique identifier assigned to the plugin instance
+    #   - delete: delete key from the backend
+    #   - deletetree: delete a folder from the backend
+    #    - exists: check for existence of key in the backend
+    #   - get: retrieve the value of a key in the backend
+    #   - list: list the key/value pairs and sub-folders available in a
+    #     folder in the backend
+    #   - put: insert a key/value pair into the backend
     #
     modules_dir = File.dirname(File.dirname(File.dirname(File.dirname(File.dirname(__FILE__)))))
     plugin_glob = File.join(modules_dir, '*', 'lib', 'puppet_x', 'simpkv', '*_plugin.rb')
@@ -65,12 +66,17 @@ simp_simpkv_adapter_class = Class.new do
       begin
         plugin_class = nil
         self.instance_eval(File.read(filename), filename)
-        if @plugin_classes.has_key?(plugin_class.type)
+        plugin_type = File.basename(filename, '_plugin.rb')
+        if @plugin_info.has_key?(plugin_type)
           msg = "Skipping load of simpkv plugin from #{filename}: " +
-            "plugin type '#{plugin_class.type}' already loaded"
+            "plugin type '#{plugin_type}' already loaded from " +
+            @plugin_info[plugin_type][:source]
           Puppet.warning(msg)
         else
-          @plugin_classes[plugin_class.type] = plugin_class
+          @plugin_info[plugin_type] = {
+            :class  => plugin_class,
+            :source => filename
+          }
         end
       rescue SyntaxError => e
         Puppet.warning("simpkv plugin from #{filename} failed to load: #{e.message}")
@@ -83,7 +89,7 @@ simp_simpkv_adapter_class = Class.new do
   # @return list of backend plugins (i.e. their types) that have successfully
   #   loaded
   def backends
-    return plugin_classes.keys.sort
+    return plugin_info.keys.sort
   end
 
   # execute delete operation on the backend, after normalizing the key
@@ -303,7 +309,6 @@ simp_simpkv_adapter_class = Class.new do
     short_bt.reverse
   end
 
-
   # @return prefix to be used in the path for global keys/folders
   def global_prefix
     'globals'
@@ -370,7 +375,7 @@ simp_simpkv_adapter_class = Class.new do
         options['backends'].has_key?(options['backend']) &&
         options['backends'][ options['backend'] ].has_key?('id') &&
         options['backends'][ options['backend'] ].has_key?('type') &&
-        plugin_classes.has_key?(options['backends'][ options['backend'] ]['type'])
+        plugin_info.has_key?(options['backends'][ options['backend'] ]['type'])
     )
       raise("Malformed backend config in options=#{options}")
     end
@@ -383,7 +388,8 @@ simp_simpkv_adapter_class = Class.new do
     name = "#{type}/#{id}"
     unless plugin_instances.has_key?(name)
       begin
-        plugin_instances[name] = plugin_classes[type].new(name, options)
+        plugin_instances[name] = plugin_info[type][:class].new(name)
+        plugin_instances[name].configure(options)
       rescue Exception => e
         raise("Unable to construct '#{name}': #{e.message}")
       end

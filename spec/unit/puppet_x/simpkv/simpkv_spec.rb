@@ -29,9 +29,9 @@ describe 'simpkv adapter anonymous class' do
         # will use failer plugin for catastrophic error cases, because
         # it is badly behaved and raises exceptions on all operations
        'test_failer'  => {
-          'id'               => 'test',
-          'type'             => 'failer',
-          'fail_constructor' => false  # true = raise in constructor
+          'id'             => 'test',
+          'type'           => 'failer',
+          'fail_configure' => false  # true = raise in configure()
         },
         # will use file plugin for non-catastrophic test cases
         'test_file'  => {
@@ -47,9 +47,9 @@ describe 'simpkv adapter anonymous class' do
       'backend'  => 'test_failer',
       'backends' => {
         'test_failer'  => {
-          'id'               => 'test',
-          'type'             => 'failer',
-          'fail_constructor' => true  # true = raise in constructor
+          'id'             => 'test',
+          'type'           => 'failer',
+          'fail_configure' => true  # true = raise in constructor
         }
       }
     }
@@ -64,8 +64,10 @@ describe 'simpkv adapter anonymous class' do
     it 'should load valid plugin classes' do
       expect{ simp_simpkv_adapter_class.new }.to_not raise_error
       adapter = simp_simpkv_adapter_class.new
-      expect( adapter.plugin_classes ).to_not be_empty
-      expect( adapter.plugin_classes.keys.include?('file') ).to be true
+      expect( adapter.plugin_info ).to_not be_empty
+      expect( adapter.plugin_info.keys.include?('file') ).to be true
+      expect( adapter.plugin_info.keys.include?('failer') ).to be true
+      expect( adapter.plugin_info.keys.include?('malformed') ).to be false
     end
 
     it 'should discard a plugin class with malformed Ruby' do
@@ -159,7 +161,7 @@ describe 'simpkv adapter anonymous class' do
         it 'should create an instance when config is correct' do
           instance = @adapter.plugin_instance(@options_file)
 
-          file_class_id = @adapter.plugin_classes['file'].to_s
+          file_class_id = @adapter.plugin_info['file'][:class].to_s
           expect( instance.name ).to eq 'file/test'
           expect( instance.to_s ).to match file_class_id
         end
@@ -308,7 +310,8 @@ describe 'simpkv adapter anonymous class' do
 
       # create our own file plugin instance so we can manipulate key/store
       # independent of the simpkv adapter
-      @plugin = @adapter.plugin_classes['file'].new('other', @options_file)
+      @plugin = @adapter.plugin_info['file'][:class].new('other')
+      @plugin.configure(@options_file)
     end
 
     let(:key) { 'my/test/key' }

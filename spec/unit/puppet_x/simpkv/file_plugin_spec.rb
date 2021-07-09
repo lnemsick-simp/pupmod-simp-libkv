@@ -82,16 +82,14 @@ describe 'simpkv file plugin anonymous class' do
     FileUtils.remove_entry_secure(@tmpdir)
   end
 
-  context 'type' do
-    it "class.type should return 'file'" do
-      expect(plugin_class.type).to eq 'file'
+  context 'configure' do
+    before(:each) do
+      @plugin = plugin_class.new(@plugin_name)
     end
-  end
 
-  context 'constructor' do
     context 'success cases' do
       it 'should create the root_path tree when none exists' do
-        expect{ plugin_class.new(@plugin_name, @options) }.to_not raise_error
+        expect{ @plugin.configure(@options) }.to_not raise_error
         expect( Dir.exist?(@root_path) ).to be true
         expect( Dir.exist?(File.join(@root_path, 'globals')) ).to be true
         expect( Dir.exist?(File.join(@root_path, 'environments')) ).to be true
@@ -99,18 +97,18 @@ describe 'simpkv file plugin anonymous class' do
 
       it 'should not fail if the root_path tree exists' do
         FileUtils.mkdir_p(@root_path)
-        expect { plugin_class.new(@plugin_name, @options) }.to_not raise_error
+        expect{ @plugin.configure(@options) }.to_not raise_error
       end
     end
 
     context 'error cases' do
       it 'should fail when options is not a Hash' do
-        expect { plugin_class.new(@plugin_name, 'oops') }.
+        expect { @plugin.configure('oops') }.
           to raise_error(/Plugin misconfigured/)
       end
 
       it "should fail when options missing 'backend' key" do
-        expect { plugin_class.new(@plugin_name, {} ) }.
+        expect { @plugin.configure({}) }.
           to raise_error(/Plugin misconfigured/)
       end
 
@@ -118,8 +116,8 @@ describe 'simpkv file plugin anonymous class' do
         options = {
           'backend' => 'test'
         }
-        expect { plugin_class.new(@plugin_name, options) }.
-          to raise_error(/Plugin misconfigured: {.*backend.*}/)
+        expect { @plugin.configure({}) }.
+          to raise_error(/Plugin misconfigured: {}/)
       end
 
       it "should fail when options 'backends' key is not a Hash" do
@@ -127,7 +125,7 @@ describe 'simpkv file plugin anonymous class' do
           'backend'  => 'test',
           'backends' => 'oops'
         }
-        expect { plugin_class.new(@plugin_name, options) }.
+        expect { @plugin.configure(options) }.
           to raise_error(/Plugin misconfigured/)
       end
 
@@ -138,7 +136,7 @@ describe 'simpkv file plugin anonymous class' do
             'test1' => { 'id' => 'test', 'type' => 'consul'}
           }
         }
-        expect { plugin_class.new(@plugin_name, options) }.
+        expect { @plugin.configure(options) }.
           to raise_error(/Plugin misconfigured/)
       end
 
@@ -150,7 +148,7 @@ describe 'simpkv file plugin anonymous class' do
             'test'  => {}
           }
         }
-        expect { plugin_class.new(@plugin_name, options) }.
+        expect { @plugin.configure(options) }.
           to raise_error(/Plugin misconfigured/)
       end
 
@@ -162,7 +160,7 @@ describe 'simpkv file plugin anonymous class' do
             'test'  => { 'id' => 'test' }
           }
         }
-        expect { plugin_class.new(@plugin_name, options) }.
+        expect { @plugin.configure(options) }.
           to raise_error(/Plugin misconfigured/)
       end
 
@@ -174,7 +172,7 @@ describe 'simpkv file plugin anonymous class' do
             'test'  => { 'id' => 'test', 'type' => 'filex' }
           }
         }
-        expect { plugin_class.new(@plugin_name, options) }.
+        expect { @plugin.configure(options) }.
           to raise_error(/Plugin misconfigured/)
       end
 
@@ -195,15 +193,16 @@ describe 'simpkv file plugin anonymous class' do
         allow(FileUtils).to receive(:mkdir_p).with('/can/not/be/created').
           and_raise(Errno::EACCES, 'Permission denied')
 
-        expect { plugin_class.new(@plugin_name, options) }.
+        expect { @plugin.configure(options) }.
           to raise_error(/Unable to create configured root path/)
       end
     end
   end
 
-  context 'public API' do
+  context 'public simpkv operations API' do
     before(:each) do
-      @plugin = plugin_class.new(@plugin_name, @options)
+      @plugin = plugin_class.new(@plugin_name)
+      @plugin.configure(@options)
     end
 
     describe 'delete' do
@@ -488,7 +487,8 @@ describe 'simpkv file plugin anonymous class' do
 
   context 'internal methods' do
     before(:each) do
-      @plugin = plugin_class.new(@plugin_name, @options)
+      @plugin = plugin_class.new(@plugin_name)
+      @plugin.configure(@options)
     end
 
     describe 'ensure_folder_path' do

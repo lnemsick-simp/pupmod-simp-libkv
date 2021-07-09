@@ -15,9 +15,17 @@
     function with a 'global' Boolean option.
     - Global keys are now specified by setting 'global' to true in lieu of
       setting 'environment' to ''.
-  - Restrict letter characters used in key and folder names to be
-    lowercase.
+  - Changed the key and folder name specification to restrict letter
+    characters to lowercase.
     - Change required for the LDAP plugin.
+  - Changed the plugin configuration API
+    - Configuration has been split out into its own method, instead of being
+      done in the plugin constructor.
+    - This minimal change simplifies unit testing of configuration of complex
+      plugins.
+  - Fixed the mechanism a plugin uses to advertise its type.
+    - Plugin type is now determined from its filename.
+    - Previous mechanism did not work when when multiple plugins were used.
 - Added
   - More detailed plugin exception reporting in order to pinpoint plugin
     logic problems.

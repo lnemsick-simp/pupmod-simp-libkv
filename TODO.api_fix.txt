@@ -1,0 +1,7 @@
+unit tests updates
+- file_plugin.rb
+- simpkv.rb
+
+
+verify acceptance tests still run
+CHANGELOG entry

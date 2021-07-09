@@ -9,5 +9,6 @@ fixtures:
     compliance_markup: https://github.com/simp/pupmod-simp-compliance_markup.git
   symlinks:
     simpkv: "#{source_dir}"
-    test_plugins: "#{File.join(source_dir, 'spec', 'support', 'modules', 'test_plugins')}"
+    test_plugins1: "#{File.join(source_dir, 'spec', 'support', 'modules', 'test_plugins1')}"
+    test_plugins2: "#{File.join(source_dir, 'spec', 'support', 'modules', 'test_plugins2')}"
     simpkv_test: "#{File.join(source_dir, 'spec', 'support', 'modules', 'simpkv_test')}"
